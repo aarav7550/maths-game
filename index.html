@@ -1,0 +1,2217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Numbers — Mental Math Drills</title>
+
+<!-- PWA: installability -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14171C">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+<!-- iOS-specific: makes "Add to Home Screen" behave like a standalone app -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Numbers">
+
+<style>
+  :root{
+    --bg: #14171C;
+    --bg-raised: #1B1F26;
+    --text: #E8E6E1;
+    --text-dim: #7C838F;
+    --good: #3DDC84;
+    --bad: #FF5D5D;
+    --accent: #F4B740;
+    --border: #262B33;
+    --vh: 1vh; /* set by JS to real visible viewport unit */
+  }
+
+  html[data-theme="light"]{
+    --bg: #FFFFFF;
+    --bg-raised: #F4F5F7;
+    --text: #14171C;
+    --text-dim: #6B7078;
+    --good: #12965A;
+    --bad: #D8392F;
+    --accent: #F4B740;
+    --border: #E2E4E8;
+  }
+
+  *{ box-sizing: border-box; margin:0; padding:0; }
+
+  html,body{
+    height:100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Sohne', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color .2s ease, color .2s ease;
+  }
+
+  #app{
+    height: calc(var(--vh) * 100);
+    width:100vw; position:relative; display:flex; flex-direction:column;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 16px 24px;
+    flex-shrink:0;
+  }
+  .brand{ font-size:15px; letter-spacing:0.02em; color:var(--text-dim); font-weight:600; display:flex; align-items:center; gap:10px; }
+  .brand b{ color:var(--text); }
+  .topbar-right{ display:flex; align-items:center; gap:16px; }
+  .icon-btn{
+    background:none; border:none; color:var(--text-dim); cursor:pointer;
+    font-size:14px; font-family:inherit; padding:6px 10px; border-radius:6px;
+    transition: color .15s ease, background .15s ease;
+  }
+  .icon-btn:hover{ color:var(--text); background:var(--bg-raised); }
+  .icon-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .icon-btn:disabled{ opacity:0.3; cursor:not-allowed; }
+  .icon-btn:disabled:hover{ background:none; color:var(--text-dim); }
+
+  .streak-pill{
+    display:flex; align-items:center; gap:6px;
+    font-variant-numeric: tabular-nums;
+    font-size:14px; color:var(--accent); font-weight:600;
+  }
+  .streak-pill .dim{ color:var(--text-dim); font-weight:500; }
+
+  .theme-toggle{
+    background: var(--bg-raised); border:1px solid var(--border); color:var(--text); cursor:pointer;
+    font-size:20px; font-family:inherit; width:42px; height:42px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    transition: border-color .15s ease, transform .1s ease;
+  }
+  .theme-toggle:hover{ border-color:var(--text-dim); }
+  .theme-toggle:active{ transform: scale(0.94); }
+  .theme-toggle:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  /* ---------- timer bar ---------- */
+  .timerbar-track{
+    height:3px; width:100%; background:var(--border); flex-shrink:0;
+  }
+  .timerbar-fill{
+    height:100%; width:100%; background:var(--accent);
+    transform-origin:left; transition: transform 0.1s linear, background-color .2s ease;
+  }
+
+  /* ---------- views ---------- */
+  .view{ flex:1; display:none; min-height:0; }
+  .view.active{ display:flex; }
+
+  /* ---------- HOME view ---------- */
+  #view-home{ flex-direction:column; align-items:center; justify-content:center; gap:32px; padding:24px; overflow-y:auto; }
+  .home-title{
+    font-size: clamp(26px, 5vw, 44px);
+    font-weight:700; letter-spacing:-0.01em; text-align:center;
+  }
+  .home-sub{ color:var(--text-dim); font-size:15px; text-align:center; max-width:420px; line-height:1.5; }
+
+  .mode-grid{
+    display:grid; grid-template-columns: repeat(2, minmax(150px,220px));
+    gap:12px; width:100%; max-width:480px;
+  }
+  .mode-card{
+    background:var(--bg-raised); border:1px solid var(--border); border-radius:10px;
+    padding:16px; cursor:pointer; text-align:left; position:relative;
+    transition: border-color .15s ease, transform .1s ease;
+    color:var(--text); font-family:inherit;
+  }
+  .mode-card:hover{ border-color:var(--text-dim); }
+  .mode-card:active{ transform: scale(0.98); }
+  .mode-card:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .mode-card.selected{ border-color:var(--accent); }
+  .mode-card .mc-title{ font-size:15px; font-weight:600; margin-bottom:4px; padding-right:20px; }
+  .mode-card .mc-desc{ font-size:12.5px; color:var(--text-dim); }
+  .mode-card.customized .mc-title::after{
+    content:'•'; color:var(--accent); margin-left:6px; font-size:18px; line-height:0;
+  }
+
+  /* ---------- settings modal ---------- */
+  .settings-box{ max-width:340px; text-align:left; }
+  .settings-head{
+    font-size:16px; font-weight:700; margin-bottom:18px;
+  }
+  .settings-row{ margin-bottom:16px; }
+  .settings-footer{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    margin-top:6px; padding-top:16px; border-top:1px solid var(--border);
+  }
+  .settings-footer .btn-primary{ padding:10px 24px; font-size:14.5px; }
+  .settings-tabs{
+    display:flex; gap:6px; margin-bottom:18px; flex-wrap:wrap;
+    border-bottom:1px solid var(--border); padding-bottom:12px;
+  }
+  .settings-tabs button{
+    background:var(--bg); border:1px solid var(--border); color:var(--text-dim);
+    font-family:inherit; font-size:12.5px; font-weight:600; padding:7px 12px;
+    border-radius:7px; cursor:pointer;
+  }
+  .settings-tabs button.active{ background:var(--accent); color:#1A1300; border-color:var(--accent); }
+  .settings-row label{ font-size:12.5px; color:var(--text-dim); font-weight:600; display:block; margin-bottom:8px; }
+  .range-inputs{ display:flex; align-items:center; gap:8px; }
+  .range-input{
+    background:var(--bg); border:1px solid var(--border); border-radius:8px;
+    color:var(--text); font-family:inherit; font-size:15px; padding:9px 10px;
+    width:100%; font-variant-numeric: tabular-nums;
+  }
+  .range-input:focus{ outline:none; border-color:var(--accent); }
+  .range-inputs .dim{ color:var(--text-dim); font-size:13px; flex-shrink:0; }
+  .segmented{
+    display:flex; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:3px;
+  }
+  .segmented button{
+    flex:1; background:none; border:none; color:var(--text-dim); font-family:inherit;
+    font-size:12.5px; padding:8px 6px; border-radius:6px; cursor:pointer; font-weight:600;
+  }
+  .segmented button.active{ background:var(--bg-raised); color:var(--text); }
+
+  .include-toggle-list{ display:flex; flex-direction:column; gap:8px; }
+  .include-toggle-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--bg); border:1px solid var(--border); border-radius:8px;
+    padding:11px 14px; font-family:inherit; font-size:14px; color:var(--text-dim);
+    cursor:pointer; width:100%; text-align:left;
+  }
+  .include-toggle-row.active{ border-color:var(--accent); color:var(--text); }
+  .include-toggle-row .include-check{
+    width:18px; height:18px; border-radius:5px; border:1.5px solid var(--border);
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;
+    color:#1A1300;
+  }
+  .include-toggle-row.active .include-check{ background:var(--accent); border-color:var(--accent); }
+
+  .mixed-card{
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, var(--bg-raised), #20242c);
+  }
+
+  .start-row{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:center; }
+  .start-blocked-msg{ font-size:12.5px; color:var(--bad); text-align:center; margin-top:-8px; }
+  .btn-primary{
+    background: var(--accent); color:#1A1300; border:none; border-radius:10px;
+    padding:14px 32px; font-size:16px; font-weight:700; cursor:pointer;
+    font-family:inherit; transition: transform .1s ease, opacity .15s ease;
+  }
+  .btn-primary:hover{ opacity:0.92; }
+  .btn-primary:active{ transform: scale(0.97); }
+  .btn-primary:disabled{ opacity:0.35; cursor:not-allowed; }
+  .btn-primary:focus-visible{ outline:2px solid var(--text); outline-offset:3px; }
+
+  .duration-toggle{
+    display:flex; gap:6px; background:var(--bg-raised); border:1px solid var(--border);
+    border-radius:8px; padding:3px;
+  }
+  .duration-toggle button{
+    background:none; border:none; color:var(--text-dim); font-family:inherit;
+    font-size:13px; padding:7px 12px; border-radius:6px; cursor:pointer; font-weight:600;
+  }
+  .duration-toggle button.active{ background:var(--bg); color:var(--text); }
+
+  /* ---------- PLAY view ---------- */
+  #view-play{ flex-direction:column; align-items:center; justify-content:center; position:relative; gap:24px; padding:20px;}
+
+  .play-topline{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 4px 4px;
+  }
+  .exit-btn{
+    background:none; border:none; color:var(--text-dim); cursor:pointer;
+    font-family:inherit; font-size:13px; padding:8px 10px; border-radius:6px;
+    display:flex; align-items:center; gap:5px;
+  }
+  .exit-btn:hover{ color:var(--text); background:var(--bg-raised); }
+  .skill-tag{
+    font-size:12.5px; color:var(--text-dim); font-weight:600;
+    letter-spacing:0.01em;
+  }
+
+  .problem{
+    font-size: clamp(44px, 11vw, 90px);
+    font-weight:700; font-variant-numeric: tabular-nums; letter-spacing:-0.02em;
+    text-align:center; line-height:1;
+    transition: transform .08s ease;
+  }
+  .problem.shake{ animation: shake .28s ease; }
+  @keyframes shake{
+    0%,100%{ transform: translateX(0); }
+    25%{ transform: translateX(-10px); }
+    75%{ transform: translateX(10px); }
+  }
+
+  .answer-wrap{ display:flex; flex-direction:column; align-items:center; gap:10px; }
+
+  .answer-input{
+    background:none; border:none; border-bottom:3px solid var(--border);
+    color:var(--text); font-size: clamp(30px, 7vw, 52px); font-weight:700;
+    font-variant-numeric: tabular-nums; text-align:center; width:100%; max-width:240px;
+    font-family:inherit; padding:4px 8px; caret-color:var(--accent);
+  }
+  .answer-input:focus{ outline:none; border-bottom-color:var(--accent); }
+  .answer-input.flash-good{ border-bottom-color:var(--good); color:var(--good); }
+  .answer-input.flash-bad{ border-bottom-color:var(--bad); color:var(--bad); }
+
+  .correct-reveal{
+    font-size:14px; color:var(--bad); font-weight:600; height:18px;
+    visibility:hidden;
+  }
+  .correct-reveal.show{ visibility:visible; }
+  .correct-reveal b{ color:var(--text); font-variant-numeric: tabular-nums; }
+
+  .play-meta{
+    display:flex; justify-content:center; gap:28px;
+    font-size:13px; color:var(--text-dim); font-variant-numeric: tabular-nums;
+    flex-wrap:wrap;
+  }
+  .play-meta span b{ color:var(--text); font-weight:700; }
+
+  /* ---------- RESULTS view ---------- */
+  #view-results{ flex-direction:column; align-items:center; padding:24px; overflow-y:auto; }
+  .results-scroll{ width:100%; max-width:480px; display:flex; flex-direction:column; gap:22px; align-items:center; margin:auto; }
+  .results-title{ font-size:22px; font-weight:700; color:var(--text-dim); }
+  .results-grid{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:14px; width:100%;
+  }
+  .stat-box{
+    background:var(--bg-raised); border:1px solid var(--border); border-radius:10px;
+    padding:18px 12px; text-align:center;
+  }
+  .stat-box .num{ font-size:28px; font-weight:700; font-variant-numeric: tabular-nums; }
+  .stat-box .lbl{ font-size:11.5px; color:var(--text-dim); margin-top:4px; }
+  .stat-box.good .num{ color:var(--good); }
+  .results-actions{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  .results-actions button{ flex:1 1 auto; min-width:110px; }
+
+  .breakdown-section{ width:100%; }
+  .breakdown-title{ font-size:12.5px; color:var(--text-dim); font-weight:600; margin-bottom:10px; }
+  .detail-list{ display:flex; flex-direction:column; gap:6px; }
+  .detail-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--bg-raised); border:1px solid var(--border); border-radius:8px;
+    padding:10px 14px; font-size:13.5px; gap:10px;
+  }
+  .detail-row .dr-left{ display:flex; align-items:center; gap:8px; min-width:0; }
+  .detail-row .dr-problem{ font-variant-numeric: tabular-nums; font-weight:600; white-space:nowrap; }
+  .detail-row .dr-skilltag{ font-size:11px; color:var(--text-dim); flex-shrink:0; }
+  .detail-row .dr-time{ font-variant-numeric: tabular-nums; font-weight:700; flex-shrink:0; }
+  .detail-row.miss{ border-color: rgba(255,93,93,0.35); }
+  .detail-row .dr-wrong{ font-size:12px; color:var(--bad); font-variant-numeric: tabular-nums; }
+  .detail-row .dr-correct{ font-size:12px; color:var(--text-dim); font-variant-numeric: tabular-nums; }
+
+  .skill-stat-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--bg-raised); border:1px solid var(--border); border-radius:8px;
+    padding:10px 14px; font-size:13.5px; flex-wrap:wrap; gap:8px 0;
+  }
+  .skill-stat-row .ssr-name{ font-weight:600; flex-shrink:0; margin-right:10px; }
+  .skill-stat-row .ssr-nums{ display:flex; gap:12px; font-variant-numeric: tabular-nums; color:var(--text-dim); font-size:12px; flex-wrap:wrap; }
+  .skill-stat-row .ssr-nums b{ color:var(--text); }
+  .btn-ghost{
+    background:none; border:1px solid var(--border); color:var(--text);
+    border-radius:10px; padding:13px 24px; font-size:14.5px; font-weight:600;
+    cursor:pointer; font-family:inherit; transition: border-color .15s ease;
+  }
+  .btn-ghost:hover{ border-color:var(--text-dim); }
+  .btn-ghost:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  /* ---------- HISTORY view ---------- */
+  #view-history{ flex-direction:column; padding:24px; gap:18px; overflow-y:auto; }
+  .history-head{ display:flex; align-items:center; justify-content:space-between; }
+  .history-head h2{ font-size:20px; font-weight:700; }
+  .history-actions{ display:flex; gap:8px; }
+  .tiny-btn{
+    background:none; border:1px solid var(--border); color:var(--text-dim);
+    border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; font-family:inherit;
+  }
+  .tiny-btn:hover{ color:var(--text); border-color:var(--text-dim); }
+  .chart-wrap{
+    background:var(--bg-raised); border:1px solid var(--border); border-radius:12px;
+    padding:20px; flex-shrink:0;
+  }
+  .chart-title{ font-size:12.5px; color:var(--text-dim); font-weight:600; margin-bottom:12px; }
+  svg{ display:block; width:100%; height:auto; overflow: visible; }
+  svg text{ font-family: inherit; fill: var(--text-dim); }
+  .empty-chart-note{ font-size:12.5px; color:var(--text-dim); text-align:center; padding:8px 0 2px; }
+
+  .storage-note{
+    font-size:12px; color:var(--text-dim); line-height:1.5;
+    background:var(--bg-raised); border:1px solid var(--border); border-radius:10px;
+    padding:12px 14px;
+  }
+  .storage-note b{ color:var(--text); }
+
+  .sessions-list{ display:flex; flex-direction:column; gap:8px; }
+  .session-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--bg-raised); border:1px solid var(--border); border-radius:8px;
+    padding:12px 16px; font-size:13.5px; gap:10px; flex-wrap:wrap;
+  }
+  .session-row .sr-skill{ font-weight:600; }
+  .session-row .sr-date{ color:var(--text-dim); font-size:12px; }
+  .session-row .sr-stats{ display:flex; gap:16px; font-variant-numeric: tabular-nums; }
+  .session-row .sr-stats span b{ color:var(--text); }
+  .session-row .sr-stats span{ color:var(--text-dim); font-size:12.5px; }
+
+  .empty-state{
+    color:var(--text-dim); font-size:14px; text-align:center; padding:40px 20px;
+  }
+
+  .back-link{
+    background:none; border:none; color:var(--text-dim); cursor:pointer;
+    font-family:inherit; font-size:14px; display:flex; align-items:center; gap:6px;
+  }
+  .back-link:hover{ color:var(--text); }
+
+  /* ---------- confirm modal ---------- */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal-box{
+    background:var(--bg-raised); border:1px solid var(--border); border-radius:12px;
+    padding:22px; max-width:320px; width:100%;
+  }
+  .modal-box p{ font-size:14.5px; color:var(--text); margin-bottom:16px; line-height:1.5; }
+  .modal-actions{ display:flex; gap:10px; justify-content:flex-end; }
+
+  .practice-toggle{
+    display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim);
+    cursor:pointer; user-select:none;
+  }
+  .practice-toggle input{ width:16px; height:16px; accent-color: var(--accent); cursor:pointer; }
+
+  .challenge-code-box{
+    background:var(--bg); border:1px solid var(--border); border-radius:8px;
+    padding:12px 14px; font-size:13px; word-break:break-all; font-variant-numeric: tabular-nums;
+    color:var(--text); margin-bottom:16px; max-height:120px; overflow-y:auto;
+  }
+  .config-note{
+    font-size:12px; color:var(--text-dim); background:var(--bg-raised); border:1px solid var(--border);
+    border-radius:8px; padding:10px 14px; line-height:1.6;
+  }
+  .config-note b{ color:var(--text); }
+  .practice-badge{
+    display:inline-block; font-size:11px; font-weight:700; color:var(--accent);
+    border:1px solid var(--accent); border-radius:6px; padding:2px 8px; margin-left:8px;
+  }
+
+  /* ---------- CREATE CHALLENGE view ---------- */
+  #view-challenge{ flex-direction:column; padding:24px; gap:18px; min-height:0; align-items:center; }
+  .challenge-body{
+    display:flex; gap:32px; flex:1; min-height:0; width:100%; max-width:800px;
+  }
+  .challenge-sidebar{
+    width:220px; flex-shrink:0; display:flex; flex-direction:column; gap:18px;
+    overflow-y:auto; padding-right:4px;
+  }
+  .challenge-panel{
+    flex:1; min-width:0; overflow-y:auto; padding-right:4px;
+    display:flex; flex-direction:column;
+  }
+  .challenge-section-title{
+    font-size:13px; font-weight:700; color:var(--text-dim); text-transform:uppercase;
+    letter-spacing:0.03em; margin:0 0 10px;
+  }
+  .challenge-sidebar .challenge-section-title{ margin-top:6px; }
+  .challenge-sidebar .challenge-section-title:first-child{ margin-top:0; }
+  .challenge-skills-list{ display:flex; flex-direction:column; gap:8px; }
+  .challenge-skill-configs{ display:flex; flex-direction:column; gap:12px; }
+  .challenge-skill-config{
+    background:var(--bg-raised); border:1px solid var(--border); border-radius:10px;
+    padding:16px;
+  }
+  .challenge-skill-config .csc-title{ font-size:13.5px; font-weight:700; margin-bottom:12px; }
+  .challenge-skill-config .csc-rows{ display:flex; gap:20px; flex-wrap:wrap; }
+  .challenge-skill-config .settings-row{ margin-bottom:0; flex:1; min-width:200px; }
+  .challenge-empty-note{
+    font-size:13px; color:var(--text-dim); text-align:center; padding:40px 20px;
+    background:var(--bg-raised); border:1px dashed var(--border); border-radius:10px;
+  }
+  .challenge-footer{
+    flex-shrink:0; padding-top:16px; border-top:1px solid var(--border);
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  }
+  .challenge-footer .duration-toggle{ flex-shrink:0; }
+  .challenge-sidebar .duration-toggle{ width:fit-content; }
+  .challenge-share-row{
+    display:flex; align-items:center; gap:10px; margin-top:14px;
+  }
+
+  @media (max-width: 720px){
+    .challenge-body{ flex-direction:column; overflow-y:auto; max-width:480px; }
+    .challenge-sidebar{
+      width:100%; overflow-y:visible; padding-right:0;
+    }
+    .challenge-panel{ overflow-y:visible; padding-right:0; }
+    .challenge-skill-config .csc-rows{ flex-direction:column; gap:12px; }
+  }
+
+  @media (max-width: 480px){
+    .mode-grid{ grid-template-columns: 1fr 1fr; }
+    .results-grid{ grid-template-columns: 1fr 1fr 1fr; }
+    .topbar{ padding:12px 16px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <div class="topbar">
+    <div class="brand"><b>Numbers</b></div>
+    <div class="topbar-right">
+      <div class="streak-pill" id="topStreak" style="display:none;">
+        <span id="topStreakNum">0</span><span class="dim">streak</span>
+      </div>
+      <button class="theme-toggle" id="btnThemeToggle" title="Toggle theme">☾</button>
+      <button class="icon-btn" id="btnHistory">History</button>
+    </div>
+  </div>
+
+  <div class="timerbar-track" id="timerTrack" style="visibility:hidden;">
+    <div class="timerbar-fill" id="timerFill"></div>
+  </div>
+
+  <!-- HOME -->
+  <div class="view active" id="view-home">
+    <div>
+      <div class="home-title">How fast can you think?</div>
+      <div class="home-sub">Pick a skill to drill, or mix everything together. Every round is timed.</div>
+    </div>
+
+    <div class="mode-grid" id="modeGrid">
+      <button class="mode-card" data-skill="half">
+        <div class="mc-title">Halving</div>
+        <div class="mc-desc">Split a number in two</div>
+      </button>
+      <button class="mode-card" data-skill="x2">
+        <div class="mc-title">× 2</div>
+        <div class="mc-desc">Double it</div>
+      </button>
+      <button class="mode-card" data-skill="x3">
+        <div class="mc-title">× 3</div>
+        <div class="mc-desc">Triple it</div>
+      </button>
+      <button class="mode-card" data-skill="add2">
+        <div class="mc-title">2-digit add</div>
+        <div class="mc-desc">Add two 2-digit numbers</div>
+      </button>
+      <button class="mode-card mixed-card" data-skill="mixed">
+        <div class="mc-title">Mixed</div>
+        <div class="mc-desc">All four skills, shuffled</div>
+      </button>
+    </div>
+
+    <div class="start-row">
+      <div class="duration-toggle" id="durationToggle">
+        <button data-n="15" class="active">15</button>
+        <button data-n="30">30</button>
+        <button data-n="50">50</button>
+      </div>
+      <button class="btn-ghost" id="btnConfigure" disabled>Configure</button>
+      <button class="btn-primary" id="btnStart" disabled>Start</button>
+    </div>
+    <div class="start-row">
+      <label class="practice-toggle" id="practiceToggleRow">
+        <input type="checkbox" id="practiceCheckbox">
+        <span>Practice mode (no timer, not saved to stats)</span>
+      </label>
+    </div>
+    <div class="start-row">
+      <button class="tiny-btn" id="btnChallengeCreate">Create challenge</button>
+      <button class="tiny-btn" id="btnChallengeEnter">Enter a code</button>
+    </div>
+    <div class="start-blocked-msg" id="startBlockedMsg" style="display:none;">Include at least one skill in the mix to start.</div>
+  </div>
+
+
+  <!-- SETTINGS PANEL (modal) -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-box settings-box">
+      <div class="settings-head">
+        <span id="settingsSkillLabel">Halving</span>
+      </div>
+
+      <div class="settings-tabs" id="settingsTabs" style="display:none;">
+        <button data-skill="half">Halving</button>
+        <button data-skill="x2">× 2</button>
+        <button data-skill="x3">× 3</button>
+        <button data-skill="add2">2-digit add</button>
+        <button data-skill="include">Include</button>
+      </div>
+
+      <div class="settings-row" id="rowRangeSingle">
+        <label>Range</label>
+        <div class="range-inputs">
+          <input type="number" id="rangeMin" class="range-input" placeholder="Min">
+          <span class="dim">to</span>
+          <input type="number" id="rangeMax" class="range-input" placeholder="Max">
+        </div>
+      </div>
+
+      <div class="settings-row" id="rowRangeA" style="display:none;">
+        <label>First number range</label>
+        <div class="range-inputs">
+          <input type="number" id="rangeAMin" class="range-input" placeholder="Min">
+          <span class="dim">to</span>
+          <input type="number" id="rangeAMax" class="range-input" placeholder="Max">
+        </div>
+      </div>
+      <div class="settings-row" id="rowRangeB" style="display:none;">
+        <label>Second number range</label>
+        <div class="range-inputs">
+          <input type="number" id="rangeBMin" class="range-input" placeholder="Min">
+          <span class="dim">to</span>
+          <input type="number" id="rangeBMax" class="range-input" placeholder="Max">
+        </div>
+      </div>
+
+      <div class="settings-row" id="rowParity">
+        <label>Number type</label>
+        <div class="segmented" id="paritySeg">
+          <button data-v="any" class="active">Any</button>
+          <button data-v="even">Even only</button>
+          <button data-v="odd">Odd only</button>
+        </div>
+      </div>
+
+      <div class="settings-row" id="rowIncludeSkills" style="display:none;">
+        <label>Which skills appear in the mix</label>
+        <div id="includeSkillsList" class="include-toggle-list"></div>
+      </div>
+
+      <div class="settings-footer">
+        <button class="tiny-btn" id="btnResetSkillDefaults">Reset to default</button>
+        <button class="btn-primary" id="btnCloseSettings">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLAY -->
+  <div class="view" id="view-play">
+    <div class="play-topline">
+      <button class="exit-btn" id="btnExitRound">← Exit</button>
+      <div class="skill-tag" id="skillTag"></div>
+      <div style="width:44px;"></div>
+    </div>
+
+    <div class="problem" id="problemText">6 × 2</div>
+
+    <div class="answer-wrap">
+      <input class="answer-input" id="answerInput" inputmode="numeric" autocomplete="off" placeholder="?">
+      <div class="correct-reveal" id="correctReveal">Answer: <b id="correctRevealNum"></b></div>
+    </div>
+
+    <div class="play-meta">
+      <span id="metaProgress"><b>1</b> / 15</span>
+      <span id="metaAcc"><b>100%</b> accuracy</span>
+      <span id="metaAvg"><b>—</b> avg</span>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="view" id="view-results">
+    <div class="results-scroll">
+      <div class="results-title" id="resultsTitle">Round complete</div>
+      <div class="config-note" id="resultsConfigNote"></div>
+      <div class="results-grid">
+        <div class="stat-box good"><div class="num" id="resAcc">0%</div><div class="lbl">accuracy</div></div>
+        <div class="stat-box"><div class="num" id="resAvg">0.0s</div><div class="lbl">avg time</div></div>
+        <div class="stat-box"><div class="num" id="resBest">0.0s</div><div class="lbl">best time</div></div>
+      </div>
+
+      <div class="breakdown-section">
+        <div class="breakdown-title">Slowest questions</div>
+        <div id="slowestList" class="detail-list"></div>
+      </div>
+
+      <div class="breakdown-section" id="perSkillSection" style="display:none;">
+        <div class="breakdown-title">By skill</div>
+        <div id="perSkillList" class="detail-list"></div>
+      </div>
+
+      <div class="breakdown-section" id="missedSection" style="display:none;">
+        <div class="breakdown-title">Missed</div>
+        <div id="missedList" class="detail-list"></div>
+      </div>
+
+      <div class="results-actions">
+        <button class="btn-ghost" id="btnHome">Home</button>
+        <button class="btn-ghost" id="btnShareSet">Share this set</button>
+        <button class="btn-primary" id="btnAgain">Go again</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREATE CHALLENGE -->
+  <div class="view" id="view-challenge">
+    <div class="history-head" style="width:100%; max-width:800px;">
+      <button class="back-link" id="btnChallengeBack">← Back</button>
+      <h2>Create a challenge</h2>
+      <div class="history-actions">
+        <button class="btn-primary" id="btnChallengeGenerate" style="padding:9px 18px; font-size:13.5px;">Generate code</button>
+      </div>
+    </div>
+    <div class="challenge-body">
+      <div class="challenge-sidebar">
+        <div>
+          <div class="challenge-section-title">Skills to include</div>
+          <div id="challengeSkillsList" class="challenge-skills-list"></div>
+        </div>
+        <div>
+          <div class="challenge-section-title">Number of questions</div>
+          <div class="duration-toggle" id="challengeDurationToggle">
+            <button data-n="15" class="active">15</button>
+            <button data-n="30">30</button>
+            <button data-n="50">50</button>
+          </div>
+        </div>
+        <div class="start-blocked-msg" id="challengeCreateBlockedMsg" style="display:none;">Include at least one skill.</div>
+      </div>
+      <div class="challenge-panel">
+        <div class="challenge-section-title">Per-game settings</div>
+        <div id="challengeSkillConfigs" class="challenge-skill-configs"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="view" id="view-history">
+    <div class="history-head">
+      <button class="back-link" id="btnBackHome">← Back</button>
+      <h2>Your progress</h2>
+      <div class="history-actions">
+        <button class="tiny-btn" id="btnExportHistory">Export</button>
+        <button class="tiny-btn" id="btnImportHistory">Import</button>
+      </div>
+    </div>
+    <div class="storage-note">
+      Progress is saved in <b>this browser only</b>, and survives closing the tab or restarting your computer. It's tied to this browser profile though — clearing browsing data, using a different browser, or Incognito mode won't have it. Use <b>Export</b> now and then to back it up as a file, or to move it to another device.
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title" id="chartTitle">Average answer time per round (seconds)</div>
+      <div class="segmented" id="skillFilterSeg" style="margin-bottom:14px;"></div>
+      <svg id="chartSvg" viewBox="0 0 640 240" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="empty-chart-note" id="emptyChartNote" style="display:none;">Play a couple more rounds to see a trend here.</div>
+    </div>
+    <div class="breakdown-section">
+      <div class="breakdown-title">By skill — are you improving?</div>
+      <div id="perSkillStatsList" class="detail-list"></div>
+    </div>
+    <div class="sessions-list" id="sessionsList"></div>
+  </div>
+
+</div>
+
+<!-- exit confirm modal -->
+<div class="modal-overlay" id="exitModal">
+  <div class="modal-box">
+    <p>Leave this round? Your progress on it won't be saved.</p>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="btnCancelExit">Stay</button>
+      <button class="btn-primary" id="btnConfirmExit">Leave</button>
+    </div>
+  </div>
+</div>
+
+<!-- challenge code: show generated code -->
+<div class="modal-overlay" id="challengeShowModal">
+  <div class="modal-box">
+    <p>Share this code — anyone who enters it gets the exact same set of questions.</p>
+    <div class="challenge-code-box" id="challengeCodeText"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="btnChallengeCopy">Copy</button>
+      <button class="btn-primary" id="btnChallengeShowClose">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- challenge code: enter a code -->
+<div class="modal-overlay" id="challengeEnterModal">
+  <div class="modal-box">
+    <p>Paste a challenge code to play the same set of questions.</p>
+    <input type="text" id="challengeCodeInput" class="range-input" placeholder="Paste code here" style="margin-bottom:14px;">
+    <div class="start-blocked-msg" id="challengeEnterError" style="display:none; margin-bottom:10px;">That code doesn't look valid.</div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="btnChallengeEnterCancel">Cancel</button>
+      <button class="btn-primary" id="btnChallengeEnterGo">Start round</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="importFileInput" accept=".json" style="display:none;">
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- viewport height fix (mobile keyboard) ----------
+  function setRealVH(){
+    const vv = window.visualViewport;
+    const h = vv ? vv.height : window.innerHeight;
+    document.documentElement.style.setProperty('--vh', (h/100) + 'px');
+  }
+  setRealVH();
+  window.addEventListener('resize', setRealVH);
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', setRealVH);
+    window.visualViewport.addEventListener('scroll', setRealVH);
+  }
+
+  // ---------- theme ----------
+  const THEME_KEY = 'numbers_game_theme_v1';
+  const btnThemeToggle = document.getElementById('btnThemeToggle');
+  function applyTheme(theme){
+    document.documentElement.setAttribute('data-theme', theme);
+    btnThemeToggle.textContent = theme === 'light' ? '☀' : '☾';
+    try{ localStorage.setItem(THEME_KEY, theme); }catch(e){}
+  }
+  function loadTheme(){
+    try{ return localStorage.getItem(THEME_KEY) || 'dark'; }catch(e){ return 'dark'; }
+  }
+  applyTheme(loadTheme());
+  btnThemeToggle.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    applyTheme(current === 'light' ? 'dark' : 'light');
+    if(views.history.classList.contains('active')) renderHistory();
+  });
+
+  // ---------- persistence ----------
+  const STORAGE_KEY = 'numbers_game_sessions_v1';
+  function loadSessions(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }catch(e){ return []; }
+  }
+  function saveSessions(list){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }catch(e){}
+  }
+  let sessions = loadSessions();
+
+  // Practice rounds (no timer) are stored separately so they never affect main
+  // speed/accuracy stats or the history trend chart.
+  const PRACTICE_STORAGE_KEY = 'numbers_game_practice_sessions_v1';
+  function loadPracticeSessions(){
+    try{
+      const raw = localStorage.getItem(PRACTICE_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }catch(e){ return []; }
+  }
+  function savePracticeSessions(list){
+    try{ localStorage.setItem(PRACTICE_STORAGE_KEY, JSON.stringify(list)); }catch(e){}
+  }
+  let practiceSessions = loadPracticeSessions();
+
+  // ---------- seeded RNG (for challenge codes) ----------
+  // mulberry32: small, fast, deterministic PRNG. Same seed -> same sequence of numbers,
+  // which is what lets a challenge code reproduce an identical set of questions.
+  function mulberry32(seed){
+    let a = seed >>> 0;
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function randomSeed(){
+    return Math.floor(Math.random() * 0xFFFFFFFF);
+  }
+  // rng() is what all question generation calls instead of Math.random().
+  // It's reassigned to a seeded generator when a round starts from a challenge code.
+  let rng = Math.random;
+
+  // ---------- challenge codes ----------
+  // A challenge code packs {skill, questionCount, seed, config, included} into a short
+  // base36-ish string. Anyone who enters the same code gets the exact same question
+  // sequence, because the seed drives a deterministic RNG (mulberry32) instead of
+  // Math.random(). Scores are NOT tracked or synced anywhere — comparing results is
+  // manual (tell each other, screenshot, etc). This keeps the whole app static/serverless.
+  let pendingChallenge = null; // set when a round is about to start from an entered code
+
+  function buildChallengePayload(included, cfgBySkill, questionCount, seed){
+    // included: array of skill keys to include. cfgBySkill: {skillKey: config} for just those skills.
+    const cfg = {};
+    included.forEach(k => cfg[k] = cfgBySkill[k]);
+    return {
+      v: 2,
+      included: included,
+      n: questionCount,
+      seed: seed,
+      cfg: cfg
+    };
+  }
+
+  function encodeChallengeCode(payload){
+    const json = JSON.stringify(payload);
+    // btoa -> URL-safe base64 (no padding, +/ swapped) so it's easy to paste/share
+    const b64 = btoa(unescape(encodeURIComponent(json)))
+      .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    return b64;
+  }
+
+  function decodeChallengeCode(code){
+    try{
+      const b64 = code.trim().replace(/-/g,'+').replace(/_/g,'/');
+      const json = decodeURIComponent(escape(atob(b64)));
+      const payload = JSON.parse(json);
+      if(!payload || typeof payload !== 'object' || typeof payload.seed !== 'number') return null;
+      // v2 format: {included, cfg, n, seed}. Accept v1 too ({skill, cfg, inc, n, seed}) for old codes already shared.
+      if(payload.v === 2){
+        if(!Array.isArray(payload.included) || payload.included.length === 0) return null;
+        return payload;
+      }
+      if(payload.skill){
+        const included = payload.skill === 'mixed' ? Object.keys(payload.inc || {}).filter(k => payload.inc[k]) : [payload.skill];
+        if(included.length === 0) return null;
+        return { v:2, included: included, n: payload.n, seed: payload.seed, cfg: payload.cfg || {} };
+      }
+      return null;
+    }catch(e){
+      return null;
+    }
+  }
+
+  // ---------- skill config (persisted) ----------
+  const DEFAULT_CONFIG = {
+    half: { min: 2, max: 198, parity: 'any' },      // parity applies to the number being halved
+    x2:   { min: 2, max: 99,  parity: 'any' },
+    x3:   { min: 2, max: 33,  parity: 'any' },
+    add2: { aMin: 10, aMax: 99, bMin: 10, bMax: 99, parity: 'any' } // parity applies to both addends
+  };
+  const CONFIG_KEY = 'numbers_game_config_v1';
+  function loadConfig(){
+    try{
+      const raw = localStorage.getItem(CONFIG_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const merged = {};
+      Object.keys(DEFAULT_CONFIG).forEach(k => merged[k] = Object.assign({}, DEFAULT_CONFIG[k], parsed[k] || {}));
+      return merged;
+    }catch(e){
+      return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+    }
+  }
+  function saveConfig(){ try{ localStorage.setItem(CONFIG_KEY, JSON.stringify(skillConfig)); }catch(e){} }
+  let skillConfig = loadConfig();
+
+  // When playing a round started from a challenge code, activeChallengeCfg holds that
+  // code's config so it can be used WITHOUT ever touching/overwriting the user's own
+  // saved skillConfig. Cleared as soon as the round ends.
+  let activeChallengeCfg = null;
+  function activeConfig(skillKey){
+    if(activeChallengeCfg && activeChallengeCfg[skillKey]) return activeChallengeCfg[skillKey];
+    return skillConfig[skillKey];
+  }
+  let activeChallengeIncluded = null; // array of skill keys, set only while playing a challenge round
+  function activeIncludedList(){
+    if(activeChallengeIncluded) return activeChallengeIncluded;
+    return includedSkillList();
+  }
+
+  // ---------- which skills are included when "Mixed" is played ----------
+  const INCLUDED_KEY = 'numbers_game_mixed_included_v1';
+  const DEFAULT_INCLUDED = { half:true, x2:true, x3:true, add2:true };
+  function loadMixedIncluded(){
+    try{
+      const raw = localStorage.getItem(INCLUDED_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return Object.assign({}, DEFAULT_INCLUDED, parsed);
+    }catch(e){
+      return Object.assign({}, DEFAULT_INCLUDED);
+    }
+  }
+  function saveMixedIncluded(){ try{ localStorage.setItem(INCLUDED_KEY, JSON.stringify(mixedIncluded)); }catch(e){} }
+  let mixedIncluded = loadMixedIncluded();
+  function includedSkillList(){
+    return Object.keys(mixedIncluded).filter(k => mixedIncluded[k]);
+  }
+
+  function isCustomized(key){
+    const cur = skillConfig[key], def = DEFAULT_CONFIG[key];
+    return JSON.stringify(cur) !== JSON.stringify(def);
+  }
+
+  function randInt(min,max){
+    if(min > max){ const t=min; min=max; max=t; }
+    return Math.floor(rng()*(max-min+1))+min;
+  }
+  function randWithParity(min, max, parity){
+    // try a bunch of times, fall back to adjusting
+    for(let i=0;i<50;i++){
+      const n = randInt(min,max);
+      if(parity === 'even' && n % 2 === 0) return n;
+      if(parity === 'odd' && n % 2 !== 0) return n;
+      if(parity === 'any') return n;
+    }
+    // fallback: force parity within range
+    let n = randInt(min,max);
+    if(parity === 'even' && n % 2 !== 0) n = (n+1 <= max) ? n+1 : n-1;
+    if(parity === 'odd' && n % 2 === 0) n = (n+1 <= max) ? n+1 : n-1;
+    return n;
+  }
+
+  // ---------- no-repeat tracking ----------
+  // Remembers recent problem "keys" per skill so the same problem doesn't repeat back-to-back or too soon.
+  const recentProblems = { half:[], x2:[], x3:[], add2:[] };
+  const RECENT_MEMORY = 6; // how many past problems per skill to avoid repeating
+  function rememberProblem(skillKey, key){
+    const list = recentProblems[skillKey];
+    list.push(key);
+    if(list.length > RECENT_MEMORY) list.shift();
+  }
+  function wasRecentlyUsed(skillKey, key){
+    return recentProblems[skillKey].includes(key);
+  }
+
+  // ---------- skill generators ----------
+  const SKILLS = {
+    half: {
+      label: 'Halving',
+      gen(){
+        const cfg = activeConfig('half');
+        let min = Math.max(1, Math.min(cfg.min, cfg.max));
+        let max = Math.max(cfg.min, cfg.max);
+        let n, key, attempts = 0;
+        do{
+          n = randWithParity(min, max, cfg.parity);
+          key = 'h' + n;
+          attempts++;
+        } while(wasRecentlyUsed('half', key) && attempts < 30);
+        rememberProblem('half', key);
+        return { text: `Half of ${n}`, answer: n/2 };
+      }
+    },
+    x2: {
+      label: '× 2',
+      gen(){
+        const cfg = activeConfig('x2');
+        let min = Math.min(cfg.min, cfg.max), max = Math.max(cfg.min, cfg.max);
+        let n, key, attempts = 0;
+        do{
+          n = randWithParity(min, max, cfg.parity);
+          key = 'd' + n;
+          attempts++;
+        } while(wasRecentlyUsed('x2', key) && attempts < 30);
+        rememberProblem('x2', key);
+        return { text: `${n} × 2`, answer: n*2 };
+      }
+    },
+    x3: {
+      label: '× 3',
+      gen(){
+        const cfg = activeConfig('x3');
+        let min = Math.min(cfg.min, cfg.max), max = Math.max(cfg.min, cfg.max);
+        let n, key, attempts = 0;
+        do{
+          n = randWithParity(min, max, cfg.parity);
+          key = 't' + n;
+          attempts++;
+        } while(wasRecentlyUsed('x3', key) && attempts < 30);
+        rememberProblem('x3', key);
+        return { text: `${n} × 3`, answer: n*3 };
+      }
+    },
+    add2: {
+      label: '2-digit add',
+      gen(){
+        const cfg = activeConfig('add2');
+        let aMin = Math.min(cfg.aMin,cfg.aMax), aMax = Math.max(cfg.aMin,cfg.aMax);
+        let bMin = Math.min(cfg.bMin,cfg.bMax), bMax = Math.max(cfg.bMin,cfg.bMax);
+        let a, b, key, attempts = 0;
+        do{
+          a = randWithParity(aMin, aMax, cfg.parity);
+          b = randWithParity(bMin, bMax, cfg.parity);
+          key = 'a' + a + '_' + b;
+          attempts++;
+        } while(wasRecentlyUsed('add2', key) && attempts < 30);
+        rememberProblem('add2', key);
+        return { text: `${a} + ${b}`, answer: a+b };
+      }
+    }
+  };
+  const SKILL_ORDER = ['half','x2','x3','add2'];
+
+  // ---------- state ----------
+  let state = {
+    skill: null,
+    totalQuestions: 15,
+    currentIndex: 0,
+    correctCount: 0,
+    times: [],
+    records: [],   // per-question detail: {skillKey, text, answer, given, correct, timeMs}
+    currentProblem: null,
+    currentSkillKey: null,
+    questionStart: 0,
+    perSkillTimer: null,
+    timerDurationMs: 8000,
+    streak: 0,
+    running: false,       // true only while a round is actively in progress
+    awaitingAdvance: false, // true briefly after an answer is locked in, before next question
+    practiceMode: false,  // true = no timer, not counted in main stats
+    seed: null,            // seed used for this round's question sequence
+    fromChallenge: false   // true if this round was started by entering someone else's code
+  };
+
+  // ---------- elements ----------
+  const views = {
+    home: document.getElementById('view-home'),
+    play: document.getElementById('view-play'),
+    results: document.getElementById('view-results'),
+    history: document.getElementById('view-history'),
+    challenge: document.getElementById('view-challenge'),
+  };
+  function showView(name){
+    Object.values(views).forEach(v => v.classList.remove('active'));
+    views[name].classList.add('active');
+  }
+
+  const modeGrid = document.getElementById('modeGrid');
+  const btnStart = document.getElementById('btnStart');
+  const durationToggle = document.getElementById('durationToggle');
+  const timerTrack = document.getElementById('timerTrack');
+  const timerFill = document.getElementById('timerFill');
+  const problemText = document.getElementById('problemText');
+  const answerInput = document.getElementById('answerInput');
+  const skillTag = document.getElementById('skillTag');
+  const metaProgress = document.getElementById('metaProgress');
+  const metaAcc = document.getElementById('metaAcc');
+  const metaAvg = document.getElementById('metaAvg');
+  const topStreak = document.getElementById('topStreak');
+  const topStreakNum = document.getElementById('topStreakNum');
+  const btnHistory = document.getElementById('btnHistory');
+  const btnChallengeCreate = document.getElementById('btnChallengeCreate');
+  const correctReveal = document.getElementById('correctReveal');
+  const correctRevealNum = document.getElementById('correctRevealNum');
+  const exitModal = document.getElementById('exitModal');
+
+  // ---------- home interactions ----------
+  const btnConfigure = document.getElementById('btnConfigure');
+
+  const startBlockedMsg = document.getElementById('startBlockedMsg');
+
+  function refreshStartEligibility(){
+    const blocked = state.skill === 'mixed' && includedSkillList().length === 0;
+    btnStart.disabled = !state.skill || blocked;
+    startBlockedMsg.style.display = blocked ? 'block' : 'none';
+  }
+
+  modeGrid.addEventListener('click', (e) => {
+    const card = e.target.closest('.mode-card');
+    if(!card) return;
+    [...modeGrid.children].forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    state.skill = card.dataset.skill;
+    btnConfigure.disabled = false;
+    refreshStartEligibility();
+  });
+
+  btnConfigure.addEventListener('click', () => {
+    if(!state.skill) return;
+    if(state.skill === 'mixed'){
+      openSettings('half', true); // start on the first tab
+    } else {
+      openSettings(state.skill, false);
+    }
+  });
+
+  function markCustomizedBadges(){
+    ['half','x2','x3','add2'].forEach(key => {
+      const card = modeGrid.querySelector(`.mode-card[data-skill="${key}"]`);
+      if(card) card.classList.toggle('customized', isCustomized(key));
+    });
+  }
+  markCustomizedBadges();
+  refreshStartEligibility();
+
+  // ---------- settings modal ----------
+  const settingsModal = document.getElementById('settingsModal');
+  const settingsSkillLabel = document.getElementById('settingsSkillLabel');
+  const settingsTabs = document.getElementById('settingsTabs');
+  const rowRangeSingle = document.getElementById('rowRangeSingle');
+  const rowRangeA = document.getElementById('rowRangeA');
+  const rowRangeB = document.getElementById('rowRangeB');
+  const rowParity = document.getElementById('rowParity');
+  const rangeMin = document.getElementById('rangeMin');
+  const rangeMax = document.getElementById('rangeMax');
+  const rangeAMin = document.getElementById('rangeAMin');
+  const rangeAMax = document.getElementById('rangeAMax');
+  const rangeBMin = document.getElementById('rangeBMin');
+  const rangeBMax = document.getElementById('rangeBMax');
+  const paritySeg = document.getElementById('paritySeg');
+  const rowIncludeSkills = document.getElementById('rowIncludeSkills');
+  const includeSkillsList = document.getElementById('includeSkillsList');
+  const btnResetSkillDefaults = document.getElementById('btnResetSkillDefaults');
+  let settingsActiveSkill = null;
+  let settingsTabbedMode = false; // true when opened from Mixed (shows tabs, lets you flip between all 4 + Include)
+  const skillDisplayLabels = { half:'Halving', x2:'× 2', x3:'× 3', add2:'2-digit add' };
+
+  // Draft state: edits happen here first. Only copied into the real skillConfig/mixedIncluded on Done.
+  let draftConfig = null;       // deep copy of skillConfig while modal is open
+  let draftIncluded = null;     // copy of mixedIncluded while modal is open
+
+  function openSettings(skillKey, tabbed){
+    settingsTabbedMode = !!tabbed;
+    settingsTabs.style.display = settingsTabbedMode ? 'flex' : 'none';
+    draftConfig = JSON.parse(JSON.stringify(skillConfig));
+    draftIncluded = Object.assign({}, mixedIncluded);
+    loadSkillIntoForm(skillKey);
+    settingsModal.classList.add('show');
+  }
+
+  function loadSkillIntoForm(skillKey){
+    settingsActiveSkill = skillKey;
+
+    if(skillKey === 'include'){
+      settingsSkillLabel.textContent = 'Include in mix';
+      if(settingsTabbedMode) [...settingsTabs.children].forEach(b => b.classList.toggle('active', b.dataset.skill === 'include'));
+      rowRangeSingle.style.display = 'none';
+      rowRangeA.style.display = 'none';
+      rowRangeB.style.display = 'none';
+      rowParity.style.display = 'none';
+      rowIncludeSkills.style.display = 'block';
+      renderIncludeToggles();
+      return;
+    }
+
+    rowIncludeSkills.style.display = 'none';
+    rowParity.style.display = 'block';
+    settingsSkillLabel.textContent = skillDisplayLabels[skillKey];
+    const cfg = draftConfig[skillKey];
+
+    if(settingsTabbedMode){
+      [...settingsTabs.children].forEach(b => b.classList.toggle('active', b.dataset.skill === skillKey));
+    }
+
+    const isAdd2 = skillKey === 'add2';
+    rowRangeSingle.style.display = isAdd2 ? 'none' : 'block';
+    rowRangeA.style.display = isAdd2 ? 'block' : 'none';
+    rowRangeB.style.display = isAdd2 ? 'block' : 'none';
+
+    if(isAdd2){
+      rangeAMin.value = cfg.aMin; rangeAMax.value = cfg.aMax;
+      rangeBMin.value = cfg.bMin; rangeBMax.value = cfg.bMax;
+    } else {
+      rangeMin.value = cfg.min; rangeMax.value = cfg.max;
+    }
+
+    [...paritySeg.children].forEach(b => b.classList.toggle('active', b.dataset.v === cfg.parity));
+  }
+
+  function renderIncludeToggles(){
+    includeSkillsList.innerHTML = '';
+    SKILL_ORDER.forEach(key => {
+      const row = document.createElement('button');
+      row.className = 'include-toggle-row' + (draftIncluded[key] ? ' active' : '');
+      row.dataset.skill = key;
+      row.innerHTML = `
+        <span>${skillDisplayLabels[key]}</span>
+        <span class="include-check">${draftIncluded[key] ? '✓' : ''}</span>
+      `;
+      includeSkillsList.appendChild(row);
+    });
+  }
+
+  includeSkillsList.addEventListener('click', (e) => {
+    const row = e.target.closest('.include-toggle-row');
+    if(!row) return;
+    const key = row.dataset.skill;
+    draftIncluded[key] = !draftIncluded[key];
+    renderIncludeToggles();
+  });
+
+  function readFormIntoDraft(){
+    if(!settingsActiveSkill || settingsActiveSkill === 'include') return;
+    const key = settingsActiveSkill;
+    const cfg = draftConfig[key];
+    const activeParity = paritySeg.querySelector('.active')?.dataset.v || 'any';
+
+    if(key === 'add2'){
+      const aMin = parseInt(rangeAMin.value,10), aMax = parseInt(rangeAMax.value,10);
+      const bMin = parseInt(rangeBMin.value,10), bMax = parseInt(rangeBMax.value,10);
+      if(!Number.isNaN(aMin)) cfg.aMin = aMin;
+      if(!Number.isNaN(aMax)) cfg.aMax = aMax;
+      if(!Number.isNaN(bMin)) cfg.bMin = bMin;
+      if(!Number.isNaN(bMax)) cfg.bMax = bMax;
+    } else {
+      const min = parseInt(rangeMin.value,10), max = parseInt(rangeMax.value,10);
+      if(!Number.isNaN(min)) cfg.min = min;
+      if(!Number.isNaN(max)) cfg.max = max;
+    }
+    cfg.parity = activeParity;
+  }
+
+  settingsTabs.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    readFormIntoDraft(); // stash whichever tab we're leaving, into the draft only
+    loadSkillIntoForm(btn.dataset.skill);
+  });
+
+  paritySeg.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    [...paritySeg.children].forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    readFormIntoDraft();
+  });
+
+  [rangeMin, rangeMax, rangeAMin, rangeAMax, rangeBMin, rangeBMax].forEach(inp => {
+    inp.addEventListener('change', readFormIntoDraft);
+  });
+
+  function commitAndCloseSettings(){
+    readFormIntoDraft();
+    skillConfig = draftConfig;
+    mixedIncluded = draftIncluded;
+    saveConfig();
+    saveMixedIncluded();
+    markCustomizedBadges();
+    refreshStartEligibility();
+    settingsModal.classList.remove('show');
+  }
+
+  function discardAndCloseSettings(){
+    // draft is simply dropped — nothing written back to skillConfig/mixedIncluded/localStorage
+    settingsModal.classList.remove('show');
+  }
+
+  document.getElementById('btnCloseSettings').addEventListener('click', commitAndCloseSettings);
+
+  // Tap outside the modal box discards any unsaved edits, matching standard app popup behavior.
+  settingsModal.addEventListener('click', (e) => {
+    if(e.target === settingsModal) discardAndCloseSettings();
+  });
+  document.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape' && settingsModal.classList.contains('show')) discardAndCloseSettings();
+  });
+
+  btnResetSkillDefaults.addEventListener('click', () => {
+    if(!settingsActiveSkill || settingsActiveSkill === 'include') return;
+    draftConfig[settingsActiveSkill] = Object.assign({}, DEFAULT_CONFIG[settingsActiveSkill]);
+    loadSkillIntoForm(settingsActiveSkill); // refresh fields from draft, no need to reopen
+  });
+
+  durationToggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    [...durationToggle.children].forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.totalQuestions = parseInt(btn.dataset.n, 10);
+  });
+
+  btnStart.addEventListener('click', startRound);
+  document.getElementById('btnAgain').addEventListener('click', startRound);
+  document.getElementById('btnHome').addEventListener('click', () => showView('home'));
+  document.getElementById('btnShareSet').addEventListener('click', () => {
+    // Reuses the exact seed from the round just played, so a "hard set" reproduces
+    // literally — not just the same config with a fresh set of numbers.
+    const included = activeIncludedList();
+    if(included.length === 0) return;
+    const cfgBySkill = {};
+    included.forEach(k => cfgBySkill[k] = activeConfig(k));
+    const payload = buildChallengePayload(included, cfgBySkill, state.totalQuestions, state.seed);
+    showGeneratedCode(encodeChallengeCode(payload));
+  });
+  document.getElementById('btnBackHome').addEventListener('click', () => showView('home'));
+
+  // ---------- practice mode toggle ----------
+  const practiceCheckbox = document.getElementById('practiceCheckbox');
+  practiceCheckbox.addEventListener('change', () => {
+    state.practiceMode = practiceCheckbox.checked;
+  });
+
+  // ---------- challenge codes: create (dedicated screen) ----------
+  const challengeShowModal = document.getElementById('challengeShowModal');
+  const challengeCodeText = document.getElementById('challengeCodeText');
+  const challengeSkillsList = document.getElementById('challengeSkillsList');
+  const challengeSkillConfigs = document.getElementById('challengeSkillConfigs');
+  const challengeDurationToggle = document.getElementById('challengeDurationToggle');
+  const btnChallengeGenerate = document.getElementById('btnChallengeGenerate');
+  const challengeCreateBlockedMsg = document.getElementById('challengeCreateBlockedMsg');
+
+  // Independent draft state for the challenge screen — starts from the user's own saved
+  // config as a convenient default, but editing it here never touches skillConfig/mixedIncluded.
+  let challengeDraftIncluded = null;
+  let challengeDraftConfig = null;
+  let challengeDraftQuestions = 15;
+
+  function openChallengeScreen(){
+    challengeDraftIncluded = Object.assign({}, mixedIncluded);
+    challengeDraftConfig = JSON.parse(JSON.stringify(skillConfig));
+    challengeDraftQuestions = state.totalQuestions || 15;
+    renderChallengeSkillsList();
+    renderChallengeSkillConfigs();
+    [...challengeDurationToggle.children].forEach(b => b.classList.toggle('active', parseInt(b.dataset.n,10) === challengeDraftQuestions));
+    refreshChallengeGenerateEligibility();
+    showView('challenge');
+  }
+
+  function refreshChallengeGenerateEligibility(){
+    const anyIncluded = SKILL_ORDER.some(k => challengeDraftIncluded[k]);
+    btnChallengeGenerate.disabled = !anyIncluded;
+    challengeCreateBlockedMsg.style.display = anyIncluded ? 'none' : 'block';
+  }
+
+  function renderChallengeSkillsList(){
+    challengeSkillsList.innerHTML = '';
+    SKILL_ORDER.forEach(key => {
+      const row = document.createElement('button');
+      row.className = 'include-toggle-row' + (challengeDraftIncluded[key] ? ' active' : '');
+      row.dataset.skill = key;
+      row.innerHTML = `
+        <span>${skillDisplayLabels[key]}</span>
+        <span class="include-check">${challengeDraftIncluded[key] ? '✓' : ''}</span>
+      `;
+      challengeSkillsList.appendChild(row);
+    });
+  }
+  challengeSkillsList.addEventListener('click', (e) => {
+    const row = e.target.closest('.include-toggle-row');
+    if(!row) return;
+    const key = row.dataset.skill;
+    challengeDraftIncluded[key] = !challengeDraftIncluded[key];
+    renderChallengeSkillsList();
+    renderChallengeSkillConfigs();
+    refreshChallengeGenerateEligibility();
+  });
+
+  // Builds one config card per currently-included skill, each with its own range/parity
+  // inputs — all visible at once, nothing tabbed or hidden.
+  function renderChallengeSkillConfigs(){
+    challengeSkillConfigs.innerHTML = '';
+    const includedKeys = SKILL_ORDER.filter(k => challengeDraftIncluded[k]);
+    if(includedKeys.length === 0){
+      challengeSkillConfigs.innerHTML = '<div class="challenge-empty-note">Select a skill on the left to configure it.</div>';
+      return;
+    }
+    includedKeys.forEach(key => {
+      const cfg = challengeDraftConfig[key];
+      const card = document.createElement('div');
+      card.className = 'challenge-skill-config';
+      card.dataset.skill = key;
+
+      if(key === 'add2'){
+        card.innerHTML = `
+          <div class="csc-title">${skillDisplayLabels[key]}</div>
+          <div class="csc-rows">
+            <div class="settings-row">
+              <label>First number range</label>
+              <div class="range-inputs">
+                <input type="number" class="range-input cc-aMin" value="${cfg.aMin}">
+                <span class="dim">to</span>
+                <input type="number" class="range-input cc-aMax" value="${cfg.aMax}">
+              </div>
+            </div>
+            <div class="settings-row">
+              <label>Second number range</label>
+              <div class="range-inputs">
+                <input type="number" class="range-input cc-bMin" value="${cfg.bMin}">
+                <span class="dim">to</span>
+                <input type="number" class="range-input cc-bMax" value="${cfg.bMax}">
+              </div>
+            </div>
+            <div class="settings-row">
+              <label>Number type</label>
+              <div class="segmented cc-parity">
+                <button data-v="any" class="${cfg.parity==='any'?'active':''}">Any</button>
+                <button data-v="even" class="${cfg.parity==='even'?'active':''}">Even only</button>
+                <button data-v="odd" class="${cfg.parity==='odd'?'active':''}">Odd only</button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        card.innerHTML = `
+          <div class="csc-title">${skillDisplayLabels[key]}</div>
+          <div class="csc-rows">
+            <div class="settings-row">
+              <label>Range</label>
+              <div class="range-inputs">
+                <input type="number" class="range-input cc-min" value="${cfg.min}">
+                <span class="dim">to</span>
+                <input type="number" class="range-input cc-max" value="${cfg.max}">
+              </div>
+            </div>
+            <div class="settings-row">
+              <label>Number type</label>
+              <div class="segmented cc-parity">
+                <button data-v="any" class="${cfg.parity==='any'?'active':''}">Any</button>
+                <button data-v="even" class="${cfg.parity==='even'?'active':''}">Even only</button>
+                <button data-v="odd" class="${cfg.parity==='odd'?'active':''}">Odd only</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      challengeSkillConfigs.appendChild(card);
+    });
+  }
+
+  // Delegated listeners for all dynamically-created config cards
+  challengeSkillConfigs.addEventListener('click', (e) => {
+    const btn = e.target.closest('.cc-parity button');
+    if(!btn) return;
+    const card = btn.closest('.challenge-skill-config');
+    const key = card.dataset.skill;
+    [...card.querySelectorAll('.cc-parity button')].forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    challengeDraftConfig[key].parity = btn.dataset.v;
+  });
+  challengeSkillConfigs.addEventListener('change', (e) => {
+    const input = e.target.closest('input.range-input');
+    if(!input) return;
+    const card = input.closest('.challenge-skill-config');
+    const key = card.dataset.skill;
+    const val = parseInt(input.value, 10);
+    if(Number.isNaN(val)) return;
+    if(input.classList.contains('cc-min')) challengeDraftConfig[key].min = val;
+    if(input.classList.contains('cc-max')) challengeDraftConfig[key].max = val;
+    if(input.classList.contains('cc-aMin')) challengeDraftConfig[key].aMin = val;
+    if(input.classList.contains('cc-aMax')) challengeDraftConfig[key].aMax = val;
+    if(input.classList.contains('cc-bMin')) challengeDraftConfig[key].bMin = val;
+    if(input.classList.contains('cc-bMax')) challengeDraftConfig[key].bMax = val;
+  });
+
+  challengeDurationToggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    [...challengeDurationToggle.children].forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    challengeDraftQuestions = parseInt(btn.dataset.n, 10);
+  });
+
+  function showGeneratedCode(code){
+    challengeCodeText.textContent = code;
+    challengeShowModal.classList.add('show');
+  }
+
+  btnChallengeGenerate.addEventListener('click', () => {
+    const included = SKILL_ORDER.filter(k => challengeDraftIncluded[k]);
+    if(included.length === 0) return;
+    const seed = randomSeed();
+    const payload = buildChallengePayload(included, challengeDraftConfig, challengeDraftQuestions, seed);
+    showGeneratedCode(encodeChallengeCode(payload));
+  });
+
+  btnChallengeCreate.addEventListener('click', openChallengeScreen);
+  document.getElementById('btnChallengeBack').addEventListener('click', () => showView('home'));
+
+  document.getElementById('btnChallengeShowClose').addEventListener('click', () => {
+    challengeShowModal.classList.remove('show');
+  });
+  document.getElementById('btnChallengeCopy').addEventListener('click', () => {
+    const text = challengeCodeText.textContent;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).catch(()=>{});
+    }
+    const btn = document.getElementById('btnChallengeCopy');
+    const original = btn.textContent;
+    btn.textContent = 'Copied';
+    setTimeout(() => { btn.textContent = original; }, 1200);
+  });
+  challengeShowModal.addEventListener('click', (e) => {
+    if(e.target === challengeShowModal) challengeShowModal.classList.remove('show');
+  });
+
+  // ---------- challenge codes: enter ----------
+  const challengeEnterModal = document.getElementById('challengeEnterModal');
+  const challengeCodeInput = document.getElementById('challengeCodeInput');
+  const challengeEnterError = document.getElementById('challengeEnterError');
+
+  document.getElementById('btnChallengeEnter').addEventListener('click', () => {
+    challengeCodeInput.value = '';
+    challengeEnterError.style.display = 'none';
+    challengeEnterModal.classList.add('show');
+  });
+  document.getElementById('btnChallengeEnterCancel').addEventListener('click', () => {
+    challengeEnterModal.classList.remove('show');
+  });
+  challengeEnterModal.addEventListener('click', (e) => {
+    if(e.target === challengeEnterModal) challengeEnterModal.classList.remove('show');
+  });
+  document.getElementById('btnChallengeEnterGo').addEventListener('click', () => {
+    const payload = decodeChallengeCode(challengeCodeInput.value);
+    const validSkills = payload && payload.included.every(k => SKILLS[k]) && payload.included.length > 0
+      && Number.isInteger(payload.n) && payload.n > 0;
+    if(!validSkills){
+      challengeEnterError.style.display = 'block';
+      return;
+    }
+    pendingChallenge = payload;
+    state.practiceMode = false;
+    practiceCheckbox.checked = false;
+    challengeEnterModal.classList.remove('show');
+    startRound();
+  });
+
+  // History button: toggles into/out of the History view. Disabled entirely during a running round.
+  btnHistory.addEventListener('click', () => {
+    if(state.running) return; // guarded, but also visually disabled during play
+    if(views.history.classList.contains('active')){
+      showView('home');
+    } else {
+      renderHistory();
+      showView('history');
+    }
+  });
+
+  // ---------- exit-round flow ----------
+  const btnExitRound = document.getElementById('btnExitRound');
+  const btnCancelExit = document.getElementById('btnCancelExit');
+  const btnConfirmExit = document.getElementById('btnConfirmExit');
+
+  btnExitRound.addEventListener('click', () => {
+    pauseRoundForModal();
+    exitModal.classList.add('show');
+  });
+  btnCancelExit.addEventListener('click', () => {
+    exitModal.classList.remove('show');
+    resumeRoundAfterModal();
+  });
+  btnConfirmExit.addEventListener('click', () => {
+    exitModal.classList.remove('show');
+    endRoundAbruptly();
+    showView('home');
+  });
+
+  function pauseRoundForModal(){
+    if(state.perSkillTimer) clearTimeout(state.perSkillTimer);
+    const computed = getComputedStyle(timerFill).transform;
+    timerFill.style.transition = 'none';
+    timerFill.style.transform = computed;
+  }
+  function resumeRoundAfterModal(){
+    state.questionStart = performance.now();
+    if(!state.practiceMode) runTimerBar();
+    answerInput.focus();
+  }
+  function endRoundAbruptly(){
+    state.running = false;
+    if(state.perSkillTimer) clearTimeout(state.perSkillTimer);
+    timerTrack.style.visibility = 'hidden';
+    topStreak.style.display = 'none';
+    btnHistory.disabled = false;
+  }
+
+  // ---------- round logic ----------
+  function startRound(){
+    state.currentIndex = 0;
+    state.correctCount = 0;
+    state.times = [];
+    state.records = [];
+    state.streak = 0;
+    state.running = true;
+    state.awaitingAdvance = false;
+
+    if(pendingChallenge){
+      // Starting from an entered challenge code: use its included skills, config, question
+      // count and seed WITHOUT touching the player's own saved settings (skillConfig,
+      // mixedIncluded) at all — those are restored automatically once the round ends.
+      const ch = pendingChallenge;
+      state.skill = ch.included.length > 1 ? 'mixed' : ch.included[0];
+      state.totalQuestions = ch.n;
+      activeChallengeCfg = ch.cfg;
+      activeChallengeIncluded = ch.included;
+      state.seed = ch.seed;
+      state.fromChallenge = true;
+      pendingChallenge = null;
+    } else {
+      activeChallengeCfg = null;
+      activeChallengeIncluded = null;
+      state.seed = randomSeed();
+      state.fromChallenge = false;
+    }
+    rng = mulberry32(state.seed);
+
+    Object.keys(recentProblems).forEach(k => recentProblems[k] = []); // fresh no-repeat window per round
+
+    topStreak.style.display = 'flex';
+    topStreakNum.textContent = '0';
+    timerTrack.style.visibility = state.practiceMode ? 'hidden' : 'visible';
+    btnHistory.disabled = true;
+    showView('play');
+    nextQuestion();
+  }
+
+  function pickSkillKey(){
+    if(activeChallengeIncluded){
+      const pool = activeChallengeIncluded;
+      return pool[randInt(0, pool.length-1)];
+    }
+    if(state.skill === 'mixed'){
+      const pool = includedSkillList();
+      if(pool.length === 0) return SKILL_ORDER[randInt(0, SKILL_ORDER.length-1)]; // safety net, Start is blocked before this can happen
+      return pool[randInt(0, pool.length-1)];
+    }
+    return state.skill;
+  }
+
+  function nextQuestion(){
+    if(state.currentIndex >= state.totalQuestions){
+      finishRound();
+      return;
+    }
+    state.awaitingAdvance = false;
+    const skillKey = pickSkillKey();
+    state.currentSkillKey = skillKey;
+    state.currentProblem = SKILLS[skillKey].gen();
+    problemText.textContent = state.currentProblem.text;
+    const skillLabelPart = state.skill === 'mixed' ? SKILLS[skillKey].label : '';
+    skillTag.textContent = state.practiceMode
+      ? (skillLabelPart ? skillLabelPart + ' · Practice' : 'Practice')
+      : skillLabelPart;
+    answerInput.value = '';
+    answerInput.classList.remove('flash-good','flash-bad');
+    problemText.classList.remove('shake');
+    correctReveal.classList.remove('show');
+    updateMeta();
+    state.questionStart = performance.now();
+    if(state.practiceMode){
+      if(state.perSkillTimer) clearTimeout(state.perSkillTimer); // practice mode: no timer bar, no auto-fail
+    } else {
+      runTimerBar();
+    }
+    setTimeout(() => answerInput.focus(), 10);
+  }
+
+  function runTimerBar(){
+    if(state.perSkillTimer) clearTimeout(state.perSkillTimer);
+    timerFill.style.transition = 'none';
+    timerFill.style.transform = 'scaleX(1)';
+    timerFill.style.backgroundColor = 'var(--accent)';
+    void timerFill.offsetWidth; // force reflow
+    timerFill.style.transition = `transform ${state.timerDurationMs}ms linear, background-color .2s ease`;
+    timerFill.style.transform = 'scaleX(0)';
+    state.perSkillTimer = setTimeout(() => {
+      if(!state.running || state.awaitingAdvance) return;
+      lockInAnswer(null); // timeout = wrong, no answer given
+    }, state.timerDurationMs);
+  }
+
+  // ---------- live-checking input ----------
+  answerInput.addEventListener('input', () => {
+    if(!state.running || state.awaitingAdvance) return;
+    const raw = answerInput.value.trim();
+    if(raw === '' || raw === '-') return;
+    const value = Number(raw);
+    if(!Number.isNaN(value) && value === state.currentProblem.answer){
+      lockInAnswer(value);
+    }
+  });
+
+  // Enter still works as an explicit submit, useful to lock in a guess that doesn't match.
+  answerInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){
+      if(state.awaitingAdvance) return;
+      const raw = answerInput.value.trim();
+      if(raw === '') return;
+      lockInAnswer(Number(raw));
+    }
+  });
+
+  function lockInAnswer(value){
+    if(!state.running || state.awaitingAdvance) return;
+    state.awaitingAdvance = true;
+    if(state.perSkillTimer) clearTimeout(state.perSkillTimer);
+
+    const elapsed = performance.now() - state.questionStart;
+    const correct = value !== null && !Number.isNaN(value) && Number(value) === state.currentProblem.answer;
+
+    state.times.push(elapsed);
+    state.records.push({
+      skillKey: state.currentSkillKey,
+      text: state.currentProblem.text,
+      answer: state.currentProblem.answer,
+      given: (value === null || Number.isNaN(value)) ? null : value,
+      correct: correct,
+      timeMs: elapsed
+    });
+    if(correct){
+      state.correctCount++;
+      state.streak++;
+      answerInput.classList.add('flash-good');
+    } else {
+      state.streak = 0;
+      answerInput.classList.add('flash-bad');
+      problemText.classList.add('shake');
+      correctRevealNum.textContent = state.currentProblem.answer;
+      correctReveal.classList.add('show');
+    }
+    topStreakNum.textContent = String(state.streak);
+    state.currentIndex++;
+
+    setTimeout(() => {
+      if(!state.running) return; // user may have exited during the pause
+      if(state.currentIndex >= state.totalQuestions){
+        finishRound();
+      } else {
+        nextQuestion();
+      }
+    }, correct ? 260 : 900);
+  }
+
+  function updateMeta(){
+    metaProgress.innerHTML = `<b>${state.currentIndex+1}</b> / ${state.totalQuestions}`;
+    const attempted = state.currentIndex;
+    const acc = attempted === 0 ? 100 : Math.round((state.correctCount/attempted)*100);
+    metaAcc.innerHTML = `<b>${acc}%</b> accuracy`;
+    const avg = attempted === 0 ? null : state.times.reduce((a,b)=>a+b,0)/attempted/1000;
+    metaAvg.innerHTML = avg === null ? `<b>—</b> avg` : `<b>${avg.toFixed(1)}s</b> avg`;
+  }
+
+  function finishRound(){
+    state.running = false;
+    timerTrack.style.visibility = 'hidden';
+    topStreak.style.display = 'none';
+    btnHistory.disabled = false;
+
+    const accuracy = Math.round((state.correctCount/state.totalQuestions)*100);
+    const avgTime = state.times.reduce((a,b)=>a+b,0)/state.times.length/1000;
+    const bestTime = Math.min(...state.times)/1000;
+
+    document.getElementById('resAcc').textContent = accuracy + '%';
+    document.getElementById('resAvg').textContent = avgTime.toFixed(1) + 's';
+    document.getElementById('resBest').textContent = bestTime.toFixed(1) + 's';
+    document.getElementById('resultsTitle').textContent =
+      accuracy === 100 ? 'Flawless round' : (accuracy >= 80 ? 'Solid round' : 'Round complete');
+
+    renderResultsBreakdown();
+    renderResultsConfigNote();
+
+    const includedNow = activeIncludedList();
+    const configSnapshot = state.skill === 'mixed'
+      ? { cfg: includedNow.reduce((acc,k) => { acc[k] = JSON.parse(JSON.stringify(activeConfig(k))); return acc; }, {}), included: includedNow }
+      : { cfg: JSON.parse(JSON.stringify(activeConfig(state.skill))) };
+
+    const sessionRecord = {
+      date: Date.now(),
+      skill: state.skill,
+      questions: state.totalQuestions,
+      accuracy: accuracy,
+      avgTime: avgTime,
+      bestTime: bestTime,
+      config: configSnapshot,
+      fromChallenge: state.fromChallenge,
+      practice: state.practiceMode
+    };
+
+    if(state.practiceMode){
+      practiceSessions.push(sessionRecord);
+      savePracticeSessions(practiceSessions);
+    } else {
+      sessions.push(sessionRecord);
+      saveSessions(sessions);
+    }
+
+    showView('results');
+  }
+
+  function renderResultsBreakdown(){
+    const records = state.records;
+
+    // Slowest questions — top 5 by time, each row shows time + (if wrong) your answer vs correct
+    const slowestList = document.getElementById('slowestList');
+    slowestList.innerHTML = '';
+    const bySlow = [...records].sort((a,b) => b.timeMs - a.timeMs).slice(0, 5);
+    bySlow.forEach(r => {
+      const row = document.createElement('div');
+      row.className = 'detail-row' + (r.correct ? '' : ' miss');
+      const givenStr = r.given === null ? 'no answer' : String(r.given);
+      const answerPart = r.correct
+        ? ''
+        : `<span class="dr-wrong">${givenStr}</span> <span class="dr-correct">→ ${r.answer}</span>`;
+      row.innerHTML = `
+        <div class="dr-left">
+          <span class="dr-problem">${r.text}</span>
+          ${state.skill === 'mixed' ? `<span class="dr-skilltag">${skillDisplayLabels[r.skillKey]}</span>` : ''}
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          ${answerPart}
+          <span class="dr-time" style="color:${r.correct ? 'var(--text)' : 'var(--bad)'}">${(r.timeMs/1000).toFixed(1)}s</span>
+        </div>
+      `;
+      slowestList.appendChild(row);
+    });
+
+    // Per-skill breakdown (only relevant in mixed mode)
+    const perSkillSection = document.getElementById('perSkillSection');
+    const perSkillList = document.getElementById('perSkillList');
+    perSkillList.innerHTML = '';
+    if(state.skill === 'mixed'){
+      perSkillSection.style.display = 'block';
+      SKILL_ORDER.forEach(key => {
+        const subset = records.filter(r => r.skillKey === key);
+        if(subset.length === 0) return;
+        const correctN = subset.filter(r => r.correct).length;
+        const avg = subset.reduce((a,r)=>a+r.timeMs,0)/subset.length/1000;
+        const row = document.createElement('div');
+        row.className = 'skill-stat-row';
+        row.innerHTML = `
+          <span class="ssr-name">${skillDisplayLabels[key]}</span>
+          <span class="ssr-nums">
+            <span><b>${correctN}/${subset.length}</b> correct</span>
+            <span><b>${avg.toFixed(1)}s</b> avg</span>
+          </span>
+        `;
+        perSkillList.appendChild(row);
+      });
+    } else {
+      perSkillSection.style.display = 'none';
+    }
+
+    // Missed questions — every wrong/timed-out answer, in order played
+    const missedSection = document.getElementById('missedSection');
+    const missedList = document.getElementById('missedList');
+    missedList.innerHTML = '';
+    const missed = records.filter(r => !r.correct);
+    if(missed.length > 0){
+      missedSection.style.display = 'block';
+      missed.forEach(r => {
+        const row = document.createElement('div');
+        row.className = 'detail-row miss';
+        const givenStr = r.given === null ? 'no answer' : String(r.given);
+        row.innerHTML = `
+          <div class="dr-left">
+            <span class="dr-problem">${r.text}</span>
+            ${state.skill === 'mixed' ? `<span class="dr-skilltag">${skillDisplayLabels[r.skillKey]}</span>` : ''}
+          </div>
+          <span>
+            <span class="dr-wrong">${givenStr}</span> <span class="dr-correct">→ ${r.answer}</span>
+          </span>
+        `;
+        missedList.appendChild(row);
+      });
+    } else {
+      missedSection.style.display = 'none';
+    }
+  }
+
+  function describeSkillConfig(key, cfg){
+    if(key === 'add2'){
+      return `${skillDisplayLabels[key]}: ${cfg.aMin}–${cfg.aMax} + ${cfg.bMin}–${cfg.bMax}, ${cfg.parity}`;
+    }
+    return `${skillDisplayLabels[key]}: ${cfg.min}–${cfg.max}, ${cfg.parity}`;
+  }
+
+  function renderResultsConfigNote(){
+    const note = document.getElementById('resultsConfigNote');
+    const parts = [];
+    parts.push(`<b>${state.totalQuestions} questions</b>${state.practiceMode ? ' · practice mode' : ''}${state.fromChallenge ? ' · from a challenge code' : ''}`);
+    if(state.skill === 'mixed'){
+      const included = activeIncludedList();
+      parts.push('Mix: ' + included.map(k => skillDisplayLabels[k]).join(', '));
+      included.forEach(k => parts.push(describeSkillConfig(k, activeConfig(k))));
+    } else {
+      parts.push(describeSkillConfig(state.skill, activeConfig(state.skill)));
+    }
+    note.innerHTML = parts.join('<br>');
+  }
+
+  // ---------- history view ----------
+  const skillLabels = { half:'Halving', x2:'× 2', x3:'× 3', add2:'2-digit add', mixed:'Mixed' };
+
+  // 'all' shows every session on the chart; otherwise filters the chart + count to one skill.
+  // This is chart/count display only — the per-skill improvement summary below always covers all skills.
+  let historySkillFilter = 'all';
+
+  function buildSkillFilterSeg(){
+    const seg = document.getElementById('skillFilterSeg');
+    const present = Array.from(new Set(sessions.map(s => s.skill)));
+    if(present.length <= 1){
+      seg.style.display = 'none';
+      return;
+    }
+    seg.style.display = 'flex';
+    seg.innerHTML = '';
+    const options = [['all','All']].concat(present.map(k => [k, skillLabels[k] || k]));
+    options.forEach(([key,label]) => {
+      const btn = document.createElement('button');
+      btn.textContent = label;
+      btn.dataset.key = key;
+      if(key === historySkillFilter) btn.classList.add('active');
+      seg.appendChild(btn);
+    });
+  }
+  document.getElementById('skillFilterSeg').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    historySkillFilter = btn.dataset.key;
+    renderHistory();
+  });
+
+  function renderHistory(){
+    const list = document.getElementById('sessionsList');
+    const svg = document.getElementById('chartSvg');
+    const emptyChartNote = document.getElementById('emptyChartNote');
+    const chartTitle = document.getElementById('chartTitle');
+    list.innerHTML = '';
+    svg.innerHTML = '';
+
+    if(sessions.length === 0){
+      list.innerHTML = '<div class="empty-state">No rounds played yet. Finish a round to see your progress here.</div>';
+      emptyChartNote.style.display = 'block';
+      emptyChartNote.textContent = 'Play a round to see your trend here.';
+      document.getElementById('skillFilterSeg').style.display = 'none';
+      document.getElementById('perSkillStatsList').innerHTML = '';
+      return;
+    }
+
+    buildSkillFilterSeg();
+    renderPerSkillStats();
+
+    const filtered = historySkillFilter === 'all' ? sessions : sessions.filter(s => s.skill === historySkillFilter);
+    chartTitle.textContent = historySkillFilter === 'all'
+      ? 'Average answer time per round (seconds)'
+      : `Average answer time — ${skillLabels[historySkillFilter] || historySkillFilter} (seconds)`;
+
+    const recent = filtered.slice(-15);
+
+    if(recent.length === 0){
+      emptyChartNote.style.display = 'block';
+      emptyChartNote.textContent = 'No rounds for this skill yet.';
+    } else if(recent.length < 2){
+      emptyChartNote.style.display = 'block';
+      emptyChartNote.textContent = 'Play a couple more rounds to see a trend line here.';
+    } else {
+      emptyChartNote.style.display = 'none';
+    }
+    if(recent.length === 0) return;
+
+    // read live theme colors so the chart matches light/dark mode
+    const styles = getComputedStyle(document.documentElement);
+    const colAccent = styles.getPropertyValue('--accent').trim() || '#F4B740';
+    const colBorder = styles.getPropertyValue('--border').trim() || '#262B33';
+    const colTextDim = styles.getPropertyValue('--text-dim').trim() || '#7C838F';
+    const colBg = styles.getPropertyValue('--bg-raised').trim() || '#1B1F26';
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const W = 640, H = 240;
+    const PAD_L = 42, PAD_R = 16, PAD_T = 14, PAD_B = 34;
+    const plotW = W - PAD_L - PAD_R;
+    const plotH = H - PAD_T - PAD_B;
+
+    const times = recent.map(s => s.avgTime);
+    const rawMax = Math.max(...times);
+    const maxT = rawMax <= 0 ? 1 : Math.ceil(rawMax * 1.2 * 2) / 2; // round up to nearest 0.5
+    const minT = 0;
+
+    const stepX = recent.length > 1 ? plotW / (recent.length - 1) : 0;
+    function xFor(i){ return recent.length === 1 ? PAD_L + plotW/2 : PAD_L + i*stepX; }
+    function yFor(t){ return PAD_T + plotH - ((t-minT)/(maxT-minT||1))*plotH; }
+
+    // --- Y axis gridlines + labels (5 ticks) ---
+    const TICKS = 5;
+    for(let i=0;i<=TICKS;i++){
+      const val = (maxT/TICKS)*i;
+      const y = yFor(val);
+
+      const gridline = document.createElementNS(ns,'line');
+      gridline.setAttribute('x1', PAD_L); gridline.setAttribute('x2', W-PAD_R);
+      gridline.setAttribute('y1', y); gridline.setAttribute('y2', y);
+      gridline.setAttribute('stroke', colBorder);
+      gridline.setAttribute('stroke-width', '1');
+      svg.appendChild(gridline);
+
+      const label = document.createElementNS(ns,'text');
+      label.setAttribute('x', PAD_L - 8);
+      label.setAttribute('y', y + 4);
+      label.setAttribute('text-anchor', 'end');
+      label.setAttribute('font-size', '11');
+      label.textContent = val.toFixed(1) + 's';
+      svg.appendChild(label);
+    }
+
+    // --- trend line ---
+    let path = '';
+    recent.forEach((s,i) => {
+      const x = xFor(i), y = yFor(s.avgTime);
+      path += (i===0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+    });
+    const line = document.createElementNS(ns,'path');
+    line.setAttribute('d', path.trim());
+    line.setAttribute('fill','none');
+    line.setAttribute('stroke', colAccent);
+    line.setAttribute('stroke-width','2.5');
+    line.setAttribute('stroke-linecap','round');
+    line.setAttribute('stroke-linejoin','round');
+    svg.appendChild(line);
+
+    // --- points + X axis date labels ---
+    recent.forEach((s,i) => {
+      const x = xFor(i), y = yFor(s.avgTime);
+      const dot = document.createElementNS(ns,'circle');
+      dot.setAttribute('cx', x); dot.setAttribute('cy', y); dot.setAttribute('r', 4);
+      dot.setAttribute('fill', colBg);
+      dot.setAttribute('stroke', colAccent);
+      dot.setAttribute('stroke-width','2');
+      svg.appendChild(dot);
+
+      // show every label if few points, otherwise thin them out to avoid overlap
+      const showLabel = recent.length <= 8 || i === 0 || i === recent.length-1 || i % Math.ceil(recent.length/6) === 0;
+      if(showLabel){
+        const d = new Date(s.date);
+        const label = document.createElementNS(ns,'text');
+        label.setAttribute('x', x);
+        label.setAttribute('y', H - PAD_B + 18);
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('font-size', '10.5');
+        label.textContent = d.toLocaleDateString(undefined, {month:'short', day:'numeric'});
+        svg.appendChild(label);
+      }
+    });
+
+    // --- axis lines (drawn last-ish, under points but over gridlines is fine either order) ---
+    const xAxis = document.createElementNS(ns,'line');
+    xAxis.setAttribute('x1', PAD_L); xAxis.setAttribute('x2', W-PAD_R);
+    xAxis.setAttribute('y1', PAD_T+plotH); xAxis.setAttribute('y2', PAD_T+plotH);
+    xAxis.setAttribute('stroke', colTextDim);
+    xAxis.setAttribute('stroke-width', '1.2');
+    svg.insertBefore(xAxis, svg.firstChild);
+
+    [...filtered].reverse().slice(0,25).forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'session-row';
+      const d = new Date(s.date);
+      const dateStr = d.toLocaleDateString(undefined, {month:'short', day:'numeric'}) + ' · ' +
+                      d.toLocaleTimeString(undefined, {hour:'numeric', minute:'2-digit'});
+      row.innerHTML = `
+        <div>
+          <div class="sr-skill">${skillLabels[s.skill] || s.skill}${s.fromChallenge ? '<span class="practice-badge">Challenge</span>' : ''}</div>
+          <div class="sr-date">${dateStr}</div>
+        </div>
+        <div class="sr-stats">
+          <span><b>${s.accuracy}%</b> acc</span>
+          <span><b>${s.avgTime.toFixed(1)}s</b> avg</span>
+          <span><b>${s.bestTime.toFixed(1)}s</b> best</span>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  // ---------- per-skill improvement summary ----------
+  // Compares each skill's average time on its most recent rounds vs its earlier rounds,
+  // so "improving" or "slowing down" reflects a real trend, not just the last round.
+  function renderPerSkillStats(){
+    const container = document.getElementById('perSkillStatsList');
+    container.innerHTML = '';
+    const bySkill = {};
+    sessions.forEach(s => {
+      if(!bySkill[s.skill]) bySkill[s.skill] = [];
+      bySkill[s.skill].push(s);
+    });
+
+    Object.keys(bySkill).forEach(key => {
+      const list = bySkill[key];
+      const n = list.length;
+      const avgOverall = list.reduce((a,s)=>a+s.avgTime,0)/n;
+      const bestOverall = Math.min(...list.map(s=>s.bestTime));
+      const accOverall = Math.round(list.reduce((a,s)=>a+s.accuracy,0)/n);
+
+      let trendText = 'Not enough rounds yet';
+      let trendClass = '';
+      if(n >= 4){
+        const half = Math.floor(n/2);
+        const earlier = list.slice(0, half);
+        const laterHalf = list.slice(half);
+        const earlierAvg = earlier.reduce((a,s)=>a+s.avgTime,0)/earlier.length;
+        const laterAvg = laterHalf.reduce((a,s)=>a+s.avgTime,0)/laterHalf.length;
+        const diff = earlierAvg - laterAvg; // positive = getting faster
+        const pct = Math.abs(diff/earlierAvg*100);
+        if(pct < 3){
+          trendText = 'Holding steady';
+        } else if(diff > 0){
+          trendText = `${pct.toFixed(0)}% faster recently`;
+          trendClass = 'good';
+        } else {
+          trendText = `${pct.toFixed(0)}% slower recently`;
+        }
+      }
+
+      const row = document.createElement('div');
+      row.className = 'skill-stat-row';
+      row.innerHTML = `
+        <span class="ssr-name">${skillLabels[key] || key}</span>
+        <span class="ssr-nums">
+          <span><b>${n}</b> rounds</span>
+          <span><b>${accOverall}%</b> acc</span>
+          <span><b>${avgOverall.toFixed(1)}s</b> avg</span>
+          <span><b>${bestOverall.toFixed(1)}s</b> best</span>
+          <span style="${trendClass==='good' ? 'color:var(--good);' : ''}"><b>${trendText}</b></span>
+        </span>
+      `;
+      container.appendChild(row);
+    });
+
+    if(Object.keys(bySkill).length === 0){
+      container.innerHTML = '<div class="empty-state">No rounds played yet.</div>';
+    }
+  }
+
+  // ---------- export / import ----------
+  document.getElementById('btnExportHistory').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(sessions, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date();
+    a.href = url;
+    a.download = `numbers-history-${d.toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  const importFileInput = document.getElementById('importFileInput');
+  document.getElementById('btnImportHistory').addEventListener('click', () => importFileInput.click());
+  importFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const imported = JSON.parse(reader.result);
+        if(!Array.isArray(imported)) throw new Error('bad format');
+        const existingDates = new Set(sessions.map(s => s.date));
+        const merged = sessions.concat(imported.filter(s => !existingDates.has(s.date)));
+        merged.sort((a,b) => a.date - b.date);
+        sessions = merged;
+        saveSessions(sessions);
+        renderHistory();
+      }catch(err){
+        alert('Could not read that file — make sure it\'s a history export from this app.');
+      }
+    };
+    reader.readAsText(file);
+    importFileInput.value = '';
+  });
+
+})();
+</script>
+
+<script>
+  // Register service worker for offline support + installability.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+</script>
+
+</body>
+</html>
