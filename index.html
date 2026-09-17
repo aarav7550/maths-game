@@ -1399,7 +1399,13 @@
   document.getElementById('btnShareSet').addEventListener('click', () => {
     // Reuses the exact seed from the round just played, so a "hard set" reproduces
     // literally — not just the same config with a fresh set of numbers.
-    const included = activeIncludedList();
+    // Must reflect the skill(s) actually played in THIS round, not the live Mixed-mode
+    // toggle state — activeIncludedList() falls back to includedSkillList() (the saved
+    // mixed toggles) whenever this round wasn't itself started from a challenge code,
+    // which is exactly the case for a normal single-skill round like halving.
+    const included = activeChallengeIncluded
+      ? activeChallengeIncluded
+      : (state.skill === 'mixed' ? includedSkillList() : [state.skill]);
     if(included.length === 0) return;
     const cfgBySkill = {};
     included.forEach(k => cfgBySkill[k] = activeConfig(k));
@@ -1730,6 +1736,11 @@
   function pickSkillKey(){
     if(activeChallengeIncluded){
       const pool = activeChallengeIncluded;
+      // Single-skill challenges must NOT consume an rng() draw here — the sharer's own
+      // original round never calls pickSkillKey() for a single-skill round (it returns
+      // state.skill directly, below), so burning a draw for a 1-element pool would
+      // desync the seeded sequence from question 1 onward for anyone entering the code.
+      if(pool.length === 1) return pool[0];
       return pool[randInt(0, pool.length-1)];
     }
     if(state.skill === 'mixed'){
