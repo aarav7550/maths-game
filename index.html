@@ -1239,8 +1239,11 @@
   // Returns the difficulty key ('veryeasy'/'easy'/'difficult'/'verydifficult') whose preset
   // exactly matches this skill's current saved config, or 'custom' if none match (or it's
   // been hand-edited via Configure).
-  function matchingDifficulty(key){
-    const cfg = skillConfig[key];
+  // Matches an arbitrary config object (not necessarily the current skillConfig) against
+  // this skill's difficulty presets. Used both for the live home row and for labeling
+  // past sessions in history, since a session's saved config may no longer match your
+  // current settings.
+  function matchingDifficultyForConfig(key, cfg){
     const presets = DIFFICULTY_PRESETS[key];
     if(!presets || !cfg) return 'custom';
     const matches = (preset) => {
@@ -1252,6 +1255,10 @@
       if(matches(presets[diffKey])) return diffKey;
     }
     return 'custom';
+  }
+
+  function matchingDifficulty(key){
+    return matchingDifficultyForConfig(key, skillConfig[key]);
   }
 
   function refreshHomeDifficultyRow(){
@@ -2156,11 +2163,14 @@
     }
   }
 
+  const difficultyLabels = { veryeasy:'Very Easy', easy:'Easy', difficult:'Difficult', verydifficult:'Very Difficult', custom:'Custom' };
+
   function describeSkillConfig(key, cfg){
+    const diff = difficultyLabels[matchingDifficultyForConfig(key, cfg)];
     if(key === 'add'){
-      return `${skillDisplayLabels[key]}: ${cfg.min}–${cfg.max}, ${cfg.count || 2} numbers, ${cfg.parity}`;
+      return `${skillDisplayLabels[key]}: ${diff} (${cfg.min}–${cfg.max}, ${cfg.count || 2} numbers, ${cfg.parity})`;
     }
-    return `${skillDisplayLabels[key]}: ${cfg.min}–${cfg.max}, ${cfg.parity}`;
+    return `${skillDisplayLabels[key]}: ${diff} (${cfg.min}–${cfg.max}, ${cfg.parity})`;
   }
 
   function renderResultsConfigNote(){
@@ -2191,20 +2201,23 @@
     return describeSkillConfig(s.skill, s.config.cfg);
   }
 
-  // Range string for one skill's config, "min–max" or "min–max, N nums" for addition.
+  // Difficulty + range string for one skill's config, e.g. "Easy (100–299)" or
+  // "Custom (1–999, 3 nums)" for addition.
   function rangeStr(key, cfg){
     if(!cfg) return '';
-    return key === 'add' ? `${cfg.min}–${cfg.max}, ${cfg.count || 2} nums` : `${cfg.min}–${cfg.max}`;
+    const diff = difficultyLabels[matchingDifficultyForConfig(key, cfg)];
+    const detail = key === 'add' ? `${cfg.min}–${cfg.max}, ${cfg.count || 2} nums` : `${cfg.min}–${cfg.max}`;
+    return `${diff} (${detail})`;
   }
 
-  // For the per-skill summary: if every session used the exact same range (and count,
-  // for addition), show it; otherwise say it varies rather than trying to combine them.
+  // For the per-skill summary: if every session used the exact same difficulty/range (and
+  // count, for addition), show it; otherwise say it varies rather than trying to combine them.
   function summarizeRangeAcrossSessions(key, list){
     const getCfg = (s) => s.skill === 'mixed' ? (s.config?.cfg?.[key]) : s.config?.cfg;
     const strs = list.map(s => rangeStr(key, getCfg(s))).filter(Boolean);
     if(strs.length === 0) return '';
     const allSame = strs.every(s => s === strs[0]);
-    return allSame ? strs[0] : 'range varies';
+    return allSame ? strs[0] : 'difficulty varies';
   }
 
   // 'all' shows every session on the chart; otherwise filters the chart + count to one skill.
