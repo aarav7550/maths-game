@@ -164,11 +164,19 @@
   .mode-card:active{ transform: scale(0.98); }
   .mode-card:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
   .mode-card.selected{ border-color:var(--accent); }
-  .mode-card .mc-title{ font-size:15px; font-weight:600; margin-bottom:4px; padding-right:20px; }
+  .mode-card .mc-title{ font-size:15px; font-weight:600; margin-bottom:4px; }
   .mode-card .mc-desc{ font-size:12.5px; color:var(--text-dim); }
-  .mode-card.customized .mc-title::after{
-    content:'•'; color:var(--accent); margin-left:6px; font-size:18px; line-height:0;
+
+  .home-difficulty-row{
+    width:100%; max-width:480px; display:flex; flex-direction:column; gap:8px;
+    background:var(--bg-raised); border:1px solid var(--border); border-radius:10px;
+    padding:12px 14px;
   }
+  .home-difficulty-row .hdr-label{ font-size:12.5px; color:var(--text-dim); font-weight:600; }
+  .home-difficulty-row .segmented{ flex-wrap:wrap; }
+  .home-difficulty-row .segmented button{ flex:1 1 auto; min-width:64px; }
+  .home-difficulty-row.mixed-disabled .segmented{ opacity:0.45; pointer-events:none; }
+  .hdr-mixed-note{ font-size:11.5px; color:var(--text-dim); }
 
   /* ---------- settings modal ---------- */
   .settings-box{ max-width:340px; text-align:left; }
@@ -350,6 +358,7 @@
   .skill-stat-row .ssr-name{ font-weight:600; flex-shrink:0; margin-right:10px; }
   .skill-stat-row .ssr-nums{ display:flex; gap:12px; font-variant-numeric: tabular-nums; color:var(--text-dim); font-size:12px; flex-wrap:wrap; }
   .skill-stat-row .ssr-nums b{ color:var(--text); }
+  .skill-stat-row .ssr-range{ width:100%; color:var(--text-dim); font-size:11.5px; }
   .btn-ghost{
     background:none; border:1px solid var(--border); color:var(--text);
     border-radius:10px; padding:13px 24px; font-size:14.5px; font-weight:600;
@@ -359,7 +368,8 @@
   .btn-ghost:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
 
   /* ---------- HISTORY view ---------- */
-  #view-history{ flex-direction:column; padding:24px; gap:18px; overflow-y:auto; }
+  #view-history{ flex-direction:column; padding:24px; gap:18px; overflow-y:auto; align-items:center; }
+  .history-head, .storage-note, .history-columns{ width:100%; max-width:1100px; }
   .history-head{ display:flex; align-items:center; justify-content:space-between; }
   .history-head h2{ font-size:20px; font-weight:700; }
   .history-actions{ display:flex; gap:8px; }
@@ -368,6 +378,15 @@
     border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; font-family:inherit;
   }
   .tiny-btn:hover{ color:var(--text); border-color:var(--text-dim); }
+
+  .history-columns{ display:flex; gap:20px; align-items:flex-start; }
+  .history-col-main{ flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:18px; }
+  .history-col-side{ flex:0 0 320px; min-width:0; }
+  @media (max-width: 860px){
+    .history-columns{ flex-direction:column; }
+    .history-col-side{ flex-basis:auto; width:100%; }
+  }
+
   .chart-wrap{
     background:var(--bg-raised); border:1px solid var(--border); border-radius:12px;
     padding:20px; flex-shrink:0;
@@ -392,6 +411,7 @@
   }
   .session-row .sr-skill{ font-weight:600; }
   .session-row .sr-date{ color:var(--text-dim); font-size:12px; }
+  .session-row .sr-config{ color:var(--text-dim); font-size:11.5px; margin-top:2px; }
   .session-row .sr-stats{ display:flex; gap:16px; font-variant-numeric: tabular-nums; }
   .session-row .sr-stats span b{ color:var(--text); }
   .session-row .sr-stats span{ color:var(--text-dim); font-size:12.5px; }
@@ -548,14 +568,26 @@
         <div class="mc-title">× 3</div>
         <div class="mc-desc">Triple it</div>
       </button>
-      <button class="mode-card" data-skill="add2">
-        <div class="mc-title">2-digit add</div>
-        <div class="mc-desc">Add two 2-digit numbers</div>
+      <button class="mode-card" data-skill="add">
+        <div class="mc-title">Additions</div>
+        <div class="mc-desc">Add several numbers together</div>
       </button>
       <button class="mode-card mixed-card" data-skill="mixed">
         <div class="mc-title">Mixed</div>
         <div class="mc-desc">All four skills, shuffled</div>
       </button>
+    </div>
+
+    <div class="home-difficulty-row" id="homeDifficultyRow" style="display:none;">
+      <span class="hdr-label">Difficulty</span>
+      <div class="segmented" id="homeDifficultySeg">
+        <button data-v="veryeasy">Very Easy</button>
+        <button data-v="easy">Easy</button>
+        <button data-v="difficult">Difficult</button>
+        <button data-v="verydifficult">Very Difficult</button>
+        <button data-v="custom">Custom</button>
+      </div>
+      <div class="hdr-mixed-note" id="homeDifficultyMixedNote" style="display:none;">Mixed uses its own range per skill — use Custom to set each one.</div>
     </div>
 
     <div class="start-row">
@@ -592,8 +624,18 @@
         <button data-skill="half">Halving</button>
         <button data-skill="x2">× 2</button>
         <button data-skill="x3">× 3</button>
-        <button data-skill="add2">2-digit add</button>
+        <button data-skill="add">Additions</button>
         <button data-skill="include">Include</button>
+      </div>
+
+      <div class="settings-row" id="rowDifficulty">
+        <label>Difficulty</label>
+        <div class="segmented" id="difficultySeg">
+          <button data-v="veryeasy">Very Easy</button>
+          <button data-v="easy">Easy</button>
+          <button data-v="difficult">Difficult</button>
+          <button data-v="verydifficult">Very Difficult</button>
+        </div>
       </div>
 
       <div class="settings-row" id="rowRangeSingle">
@@ -605,20 +647,13 @@
         </div>
       </div>
 
-      <div class="settings-row" id="rowRangeA" style="display:none;">
-        <label>First number range</label>
-        <div class="range-inputs">
-          <input type="number" id="rangeAMin" class="range-input" placeholder="Min">
-          <span class="dim">to</span>
-          <input type="number" id="rangeAMax" class="range-input" placeholder="Max">
-        </div>
-      </div>
-      <div class="settings-row" id="rowRangeB" style="display:none;">
-        <label>Second number range</label>
-        <div class="range-inputs">
-          <input type="number" id="rangeBMin" class="range-input" placeholder="Min">
-          <span class="dim">to</span>
-          <input type="number" id="rangeBMax" class="range-input" placeholder="Max">
+      <div class="settings-row" id="rowAddCount" style="display:none;">
+        <label>How many numbers</label>
+        <div class="segmented" id="addCountSeg">
+          <button data-v="2">2</button>
+          <button data-v="3">3</button>
+          <button data-v="4">4</button>
+          <button data-v="5">5</button>
         </div>
       </div>
 
@@ -744,17 +779,23 @@
     <div class="storage-note">
       Progress is saved in <b>this browser only</b>, and survives closing the tab or restarting your computer. It's tied to this browser profile though — clearing browsing data, using a different browser, or Incognito mode won't have it. Use <b>Export</b> now and then to back it up as a file, or to move it to another device.
     </div>
-    <div class="chart-wrap">
-      <div class="chart-title" id="chartTitle">Average answer time per round (seconds)</div>
-      <div class="segmented" id="skillFilterSeg" style="margin-bottom:14px;"></div>
-      <svg id="chartSvg" viewBox="0 0 640 240" preserveAspectRatio="xMidYMid meet"></svg>
-      <div class="empty-chart-note" id="emptyChartNote" style="display:none;">Play a couple more rounds to see a trend here.</div>
+    <div class="history-columns">
+      <div class="history-col-main">
+        <div class="chart-wrap">
+          <div class="chart-title" id="chartTitle">Average answer time per round (seconds)</div>
+          <div class="segmented" id="skillFilterSeg" style="margin-bottom:14px;"></div>
+          <svg id="chartSvg" viewBox="0 0 640 240" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="empty-chart-note" id="emptyChartNote" style="display:none;">Play a couple more rounds to see a trend here.</div>
+        </div>
+        <div class="sessions-list" id="sessionsList"></div>
+      </div>
+      <div class="history-col-side">
+        <div class="breakdown-section">
+          <div class="breakdown-title">By skill — are you improving?</div>
+          <div id="perSkillStatsList" class="detail-list"></div>
+        </div>
+      </div>
     </div>
-    <div class="breakdown-section">
-      <div class="breakdown-title">By skill — are you improving?</div>
-      <div id="perSkillStatsList" class="detail-list"></div>
-    </div>
-    <div class="sessions-list" id="sessionsList"></div>
   </div>
 
 </div>
@@ -956,13 +997,26 @@
     half: { min: 2, max: 198, parity: 'any' },      // parity applies to the number being halved
     x2:   { min: 2, max: 99,  parity: 'any' },
     x3:   { min: 2, max: 33,  parity: 'any' },
-    add2: { aMin: 10, aMax: 99, bMin: 10, bMax: 99, parity: 'any' } // parity applies to both addends
+    add: { min: 1, max: 99, count: 2, parity: 'any' }
   };
   const CONFIG_KEY = 'numbers_game_config_v1';
   function loadConfig(){
     try{
       const raw = localStorage.getItem(CONFIG_KEY);
       const parsed = raw ? JSON.parse(raw) : {};
+      // migrate old two-range add2 config (aMin/aMax/bMin/bMax) into the new
+      // single-range + count shape, so existing saved settings aren't lost
+      if(parsed.add2 && !parsed.add){
+        const old = parsed.add2;
+        if(old.aMin !== undefined){
+          parsed.add = {
+            min: Math.min(old.aMin, old.bMin !== undefined ? old.bMin : old.aMin),
+            max: Math.max(old.aMax, old.bMax !== undefined ? old.bMax : old.aMax),
+            count: 2,
+            parity: old.parity || 'any'
+          };
+        }
+      }
       const merged = {};
       Object.keys(DEFAULT_CONFIG).forEach(k => merged[k] = Object.assign({}, DEFAULT_CONFIG[k], parsed[k] || {}));
       return merged;
@@ -989,11 +1043,12 @@
 
   // ---------- which skills are included when "Mixed" is played ----------
   const INCLUDED_KEY = 'numbers_game_mixed_included_v1';
-  const DEFAULT_INCLUDED = { half:true, x2:true, x3:true, add2:true };
+  const DEFAULT_INCLUDED = { half:true, x2:true, x3:true, add:true };
   function loadMixedIncluded(){
     try{
       const raw = localStorage.getItem(INCLUDED_KEY);
       const parsed = raw ? JSON.parse(raw) : {};
+      if(parsed.add2 !== undefined && parsed.add === undefined) parsed.add = parsed.add2;
       return Object.assign({}, DEFAULT_INCLUDED, parsed);
     }catch(e){
       return Object.assign({}, DEFAULT_INCLUDED);
@@ -1003,11 +1058,6 @@
   let mixedIncluded = loadMixedIncluded();
   function includedSkillList(){
     return Object.keys(mixedIncluded).filter(k => mixedIncluded[k]);
-  }
-
-  function isCustomized(key){
-    const cur = skillConfig[key], def = DEFAULT_CONFIG[key];
-    return JSON.stringify(cur) !== JSON.stringify(def);
   }
 
   function randInt(min,max){
@@ -1035,7 +1085,7 @@
   // per skill; once the pool of values matching the current config is exhausted, it resets
   // that skill's tracking and starts a fresh no-repeat cycle (so small ranges cycle cleanly
   // instead of getting stuck retrying forever or being allowed to hard-repeat indefinitely).
-  const usedThisRound = { half:new Set(), x2:new Set(), x3:new Set(), add2:new Set() };
+  const usedThisRound = { half:new Set(), x2:new Set(), x3:new Set(), add:new Set() };
   function resetUsedTracking(){
     Object.keys(usedThisRound).forEach(k => usedThisRound[k].clear());
   }
@@ -1062,23 +1112,22 @@
     used.add(n);
     return n;
   }
-  // add2 pairs: pool size is (count of valid a-values) x (count of valid b-values) — usually
-  // large, so this rarely resets, but stays correct if the ranges are tiny too.
-  function drawUniquePair(skillKey, aMin, aMax, bMin, bMax, parity){
-    const poolA = countPoolSize(aMin, aMax, parity);
-    const poolB = countPoolSize(bMin, bMax, parity);
-    const pool = poolA * poolB;
+  // addition sets: pool size is (count of valid values in range) ^ count — usually large,
+  // so this rarely resets, but stays correct if the range is tiny too.
+  function drawUniqueSet(skillKey, min, max, parity, count){
+    const poolSize = countPoolSize(min, max, parity);
+    const pool = Math.pow(poolSize, count);
     const used = usedThisRound[skillKey];
     if(pool > 0 && used.size >= pool) used.clear();
-    let a, b, key, attempts = 0;
+    let nums, key, attempts = 0;
     do{
-      a = randWithParity(aMin, aMax, parity);
-      b = randWithParity(bMin, bMax, parity);
-      key = a + '_' + b;
+      nums = [];
+      for(let i = 0; i < count; i++) nums.push(randWithParity(min, max, parity));
+      key = nums.join('_');
       attempts++;
     } while(used.has(key) && attempts < 50);
     used.add(key);
-    return { a, b };
+    return nums;
   }
 
   // ---------- skill generators ----------
@@ -1111,18 +1160,18 @@
         return { text: `${n} × 3`, answer: n*3 };
       }
     },
-    add2: {
-      label: '2-digit add',
+    add: {
+      label: 'Additions',
       gen(){
-        const cfg = activeConfig('add2');
-        let aMin = Math.min(cfg.aMin,cfg.aMax), aMax = Math.max(cfg.aMin,cfg.aMax);
-        let bMin = Math.min(cfg.bMin,cfg.bMax), bMax = Math.max(cfg.bMin,cfg.bMax);
-        const { a, b } = drawUniquePair('add2', aMin, aMax, bMin, bMax, cfg.parity);
-        return { text: `${a} + ${b}`, answer: a+b };
+        const cfg = activeConfig('add');
+        let min = Math.min(cfg.min,cfg.max), max = Math.max(cfg.min,cfg.max);
+        const count = cfg.count || 2;
+        const nums = drawUniqueSet('add', min, max, cfg.parity, count);
+        return { text: nums.join(' + '), answer: nums.reduce((a,b) => a+b, 0) };
       }
     }
   };
-  const SKILL_ORDER = ['half','x2','x3','add2'];
+  const SKILL_ORDER = ['half','x2','x3','add'];
 
 
   // ---------- state ----------
@@ -1183,6 +1232,63 @@
 
   const startBlockedMsg = document.getElementById('startBlockedMsg');
 
+  const homeDifficultyRow = document.getElementById('homeDifficultyRow');
+  const homeDifficultySeg = document.getElementById('homeDifficultySeg');
+  const homeDifficultyMixedNote = document.getElementById('homeDifficultyMixedNote');
+
+  // Returns the difficulty key ('veryeasy'/'easy'/'difficult'/'verydifficult') whose preset
+  // exactly matches this skill's current saved config, or 'custom' if none match (or it's
+  // been hand-edited via Configure).
+  function matchingDifficulty(key){
+    const cfg = skillConfig[key];
+    const presets = DIFFICULTY_PRESETS[key];
+    if(!presets || !cfg) return 'custom';
+    const matches = (preset) => {
+      if(cfg.min !== preset.min || cfg.max !== preset.max) return false;
+      if(key === 'add' && (cfg.count || 2) !== (preset.count || 2)) return false;
+      return true;
+    };
+    for(const diffKey of Object.keys(presets)){
+      if(matches(presets[diffKey])) return diffKey;
+    }
+    return 'custom';
+  }
+
+  function refreshHomeDifficultyRow(){
+    if(!state.skill){
+      homeDifficultyRow.style.display = 'none';
+      return;
+    }
+    homeDifficultyRow.style.display = 'flex';
+    if(state.skill === 'mixed'){
+      homeDifficultyRow.classList.add('mixed-disabled');
+      homeDifficultyMixedNote.style.display = 'block';
+      [...homeDifficultySeg.children].forEach(b => b.classList.remove('active'));
+      return;
+    }
+    homeDifficultyRow.classList.remove('mixed-disabled');
+    homeDifficultyMixedNote.style.display = 'none';
+    const current = matchingDifficulty(state.skill);
+    [...homeDifficultySeg.children].forEach(b => b.classList.toggle('active', b.dataset.v === current));
+  }
+
+  homeDifficultySeg.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn || !state.skill || state.skill === 'mixed') return;
+    const key = state.skill;
+    if(btn.dataset.v === 'custom'){
+      openSettings(key, false); // let them hand-tune range/count/parity
+      return;
+    }
+    const preset = DIFFICULTY_PRESETS[key]?.[btn.dataset.v];
+    if(!preset) return;
+    skillConfig[key].min = preset.min;
+    skillConfig[key].max = preset.max;
+    if(key === 'add' && preset.count) skillConfig[key].count = preset.count;
+    saveConfig();
+    refreshHomeDifficultyRow();
+  });
+
   function refreshStartEligibility(){
     const blocked = state.skill === 'mixed' && includedSkillList().length === 0;
     btnStart.disabled = !state.skill || blocked;
@@ -1197,6 +1303,7 @@
     state.skill = card.dataset.skill;
     btnConfigure.disabled = false;
     refreshStartEligibility();
+    refreshHomeDifficultyRow();
   });
 
   btnConfigure.addEventListener('click', () => {
@@ -1208,36 +1315,57 @@
     }
   });
 
-  function markCustomizedBadges(){
-    ['half','x2','x3','add2'].forEach(key => {
-      const card = modeGrid.querySelector(`.mode-card[data-skill="${key}"]`);
-      if(card) card.classList.toggle('customized', isCustomized(key));
-    });
-  }
-  markCustomizedBadges();
   refreshStartEligibility();
+  refreshHomeDifficultyRow();
 
   // ---------- settings modal ----------
   const settingsModal = document.getElementById('settingsModal');
   const settingsSkillLabel = document.getElementById('settingsSkillLabel');
   const settingsTabs = document.getElementById('settingsTabs');
   const rowRangeSingle = document.getElementById('rowRangeSingle');
-  const rowRangeA = document.getElementById('rowRangeA');
-  const rowRangeB = document.getElementById('rowRangeB');
+  const rowAddCount = document.getElementById('rowAddCount');
+  const addCountSeg = document.getElementById('addCountSeg');
   const rowParity = document.getElementById('rowParity');
+  const rowDifficulty = document.getElementById('rowDifficulty');
+  const difficultySeg = document.getElementById('difficultySeg');
   const rangeMin = document.getElementById('rangeMin');
   const rangeMax = document.getElementById('rangeMax');
-  const rangeAMin = document.getElementById('rangeAMin');
-  const rangeAMax = document.getElementById('rangeAMax');
-  const rangeBMin = document.getElementById('rangeBMin');
-  const rangeBMax = document.getElementById('rangeBMax');
   const paritySeg = document.getElementById('paritySeg');
   const rowIncludeSkills = document.getElementById('rowIncludeSkills');
+
+  // ---------- difficulty presets ----------
+  // Each preset fills range (+ count for additions); parity is left alone.
+  const DIFFICULTY_PRESETS = {
+    half: {
+      veryeasy: { min: 1, max: 99 },
+      easy: { min: 100, max: 299 },
+      difficult: { min: 100, max: 999 },
+      verydifficult: { min: 1000, max: 9999 }
+    },
+    x2: {
+      veryeasy: { min: 1, max: 20 },
+      easy: { min: 20, max: 99 },
+      difficult: { min: 100, max: 499 },
+      verydifficult: { min: 500, max: 999 }
+    },
+    x3: {
+      veryeasy: { min: 1, max: 15 },
+      easy: { min: 15, max: 33 },
+      difficult: { min: 34, max: 99 },
+      verydifficult: { min: 100, max: 333 }
+    },
+    add: {
+      veryeasy: { min: 1, max: 99, count: 2 },
+      easy: { min: 1, max: 99, count: 3 },
+      difficult: { min: 1, max: 999, count: 2 },
+      verydifficult: { min: 1, max: 999, count: 3 }
+    }
+  };
   const includeSkillsList = document.getElementById('includeSkillsList');
   const btnResetSkillDefaults = document.getElementById('btnResetSkillDefaults');
   let settingsActiveSkill = null;
   let settingsTabbedMode = false; // true when opened from Mixed (shows tabs, lets you flip between all 4 + Include)
-  const skillDisplayLabels = { half:'Halving', x2:'× 2', x3:'× 3', add2:'2-digit add' };
+  const skillDisplayLabels = { half:'Halving', x2:'× 2', x3:'× 3', add:'Additions' };
 
   // Draft state: edits happen here first. Only copied into the real skillConfig/mixedIncluded on Done.
   let draftConfig = null;       // deep copy of skillConfig while modal is open
@@ -1259,9 +1387,9 @@
       settingsSkillLabel.textContent = 'Include in mix';
       if(settingsTabbedMode) [...settingsTabs.children].forEach(b => b.classList.toggle('active', b.dataset.skill === 'include'));
       rowRangeSingle.style.display = 'none';
-      rowRangeA.style.display = 'none';
-      rowRangeB.style.display = 'none';
+      rowAddCount.style.display = 'none';
       rowParity.style.display = 'none';
+      rowDifficulty.style.display = 'none';
       rowIncludeSkills.style.display = 'block';
       renderIncludeToggles();
       return;
@@ -1269,6 +1397,8 @@
 
     rowIncludeSkills.style.display = 'none';
     rowParity.style.display = 'block';
+    rowDifficulty.style.display = 'block';
+    rowRangeSingle.style.display = 'block';
     settingsSkillLabel.textContent = skillDisplayLabels[skillKey];
     const cfg = draftConfig[skillKey];
 
@@ -1276,19 +1406,18 @@
       [...settingsTabs.children].forEach(b => b.classList.toggle('active', b.dataset.skill === skillKey));
     }
 
-    const isAdd2 = skillKey === 'add2';
-    rowRangeSingle.style.display = isAdd2 ? 'none' : 'block';
-    rowRangeA.style.display = isAdd2 ? 'block' : 'none';
-    rowRangeB.style.display = isAdd2 ? 'block' : 'none';
+    const isAdd = skillKey === 'add';
+    rowAddCount.style.display = isAdd ? 'block' : 'none';
 
-    if(isAdd2){
-      rangeAMin.value = cfg.aMin; rangeAMax.value = cfg.aMax;
-      rangeBMin.value = cfg.bMin; rangeBMax.value = cfg.bMax;
-    } else {
-      rangeMin.value = cfg.min; rangeMax.value = cfg.max;
+    rangeMin.value = cfg.min; rangeMax.value = cfg.max;
+    if(isAdd){
+      [...addCountSeg.children].forEach(b => b.classList.toggle('active', b.dataset.v === String(cfg.count || 2)));
     }
 
     [...paritySeg.children].forEach(b => b.classList.toggle('active', b.dataset.v === cfg.parity));
+    // no preset stays highlighted on open — matching a preset exactly isn't tracked,
+    // so the difficulty row starts unselected and only lights up when you click one
+    [...difficultySeg.children].forEach(b => b.classList.remove('active'));
   }
 
   function renderIncludeToggles(){
@@ -1319,20 +1448,39 @@
     const cfg = draftConfig[key];
     const activeParity = paritySeg.querySelector('.active')?.dataset.v || 'any';
 
-    if(key === 'add2'){
-      const aMin = parseInt(rangeAMin.value,10), aMax = parseInt(rangeAMax.value,10);
-      const bMin = parseInt(rangeBMin.value,10), bMax = parseInt(rangeBMax.value,10);
-      if(!Number.isNaN(aMin)) cfg.aMin = aMin;
-      if(!Number.isNaN(aMax)) cfg.aMax = aMax;
-      if(!Number.isNaN(bMin)) cfg.bMin = bMin;
-      if(!Number.isNaN(bMax)) cfg.bMax = bMax;
-    } else {
-      const min = parseInt(rangeMin.value,10), max = parseInt(rangeMax.value,10);
-      if(!Number.isNaN(min)) cfg.min = min;
-      if(!Number.isNaN(max)) cfg.max = max;
+    const min = parseInt(rangeMin.value,10), max = parseInt(rangeMax.value,10);
+    if(!Number.isNaN(min)) cfg.min = min;
+    if(!Number.isNaN(max)) cfg.max = max;
+    if(key === 'add'){
+      const countBtn = addCountSeg.querySelector('.active');
+      cfg.count = countBtn ? parseInt(countBtn.dataset.v, 10) : (cfg.count || 2);
     }
     cfg.parity = activeParity;
   }
+
+  difficultySeg.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn || !settingsActiveSkill || settingsActiveSkill === 'include') return;
+    const preset = DIFFICULTY_PRESETS[settingsActiveSkill]?.[btn.dataset.v];
+    if(!preset) return;
+    [...difficultySeg.children].forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    rangeMin.value = preset.min;
+    rangeMax.value = preset.max;
+    if(settingsActiveSkill === 'add' && preset.count){
+      [...addCountSeg.children].forEach(b => b.classList.toggle('active', b.dataset.v === String(preset.count)));
+    }
+  });
+
+  addCountSeg.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    [...addCountSeg.children].forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    // manually changing count deselects any active difficulty preset, since it may
+    // no longer match after a hand edit
+    [...difficultySeg.children].forEach(b => b.classList.remove('active'));
+  });
 
   settingsTabs.addEventListener('click', (e) => {
     const btn = e.target.closest('button');
@@ -1349,8 +1497,11 @@
     readFormIntoDraft();
   });
 
-  [rangeMin, rangeMax, rangeAMin, rangeAMax, rangeBMin, rangeBMax].forEach(inp => {
-    inp.addEventListener('change', readFormIntoDraft);
+  [rangeMin, rangeMax].forEach(inp => {
+    inp.addEventListener('change', () => {
+      readFormIntoDraft();
+      [...difficultySeg.children].forEach(b => b.classList.remove('active'));
+    });
   });
 
   function commitAndCloseSettings(){
@@ -1359,8 +1510,8 @@
     mixedIncluded = draftIncluded;
     saveConfig();
     saveMixedIncluded();
-    markCustomizedBadges();
     refreshStartEligibility();
+    refreshHomeDifficultyRow();
     settingsModal.classList.remove('show');
   }
 
@@ -1490,65 +1641,82 @@
       card.className = 'challenge-skill-config';
       card.dataset.skill = key;
 
-      if(key === 'add2'){
-        card.innerHTML = `
-          <div class="csc-title">${skillDisplayLabels[key]}</div>
-          <div class="csc-rows">
-            <div class="settings-row">
-              <label>First number range</label>
-              <div class="range-inputs">
-                <input type="number" class="range-input cc-aMin" value="${cfg.aMin}">
-                <span class="dim">to</span>
-                <input type="number" class="range-input cc-aMax" value="${cfg.aMax}">
-              </div>
-            </div>
-            <div class="settings-row">
-              <label>Second number range</label>
-              <div class="range-inputs">
-                <input type="number" class="range-input cc-bMin" value="${cfg.bMin}">
-                <span class="dim">to</span>
-                <input type="number" class="range-input cc-bMax" value="${cfg.bMax}">
-              </div>
-            </div>
-            <div class="settings-row">
-              <label>Number type</label>
-              <div class="segmented cc-parity">
-                <button data-v="any" class="${cfg.parity==='any'?'active':''}">Any</button>
-                <button data-v="even" class="${cfg.parity==='even'?'active':''}">Even only</button>
-                <button data-v="odd" class="${cfg.parity==='odd'?'active':''}">Odd only</button>
-              </div>
+      const isAdd = key === 'add';
+      const presets = DIFFICULTY_PRESETS[key];
+      card.innerHTML = `
+        <div class="csc-title">${skillDisplayLabels[key]}</div>
+        <div class="csc-rows">
+          <div class="settings-row">
+            <label>Difficulty</label>
+            <div class="segmented cc-difficulty">
+              <button data-v="veryeasy">Very Easy</button>
+              <button data-v="easy">Easy</button>
+              <button data-v="difficult">Difficult</button>
+              <button data-v="verydifficult">Very Difficult</button>
             </div>
           </div>
-        `;
-      } else {
-        card.innerHTML = `
-          <div class="csc-title">${skillDisplayLabels[key]}</div>
-          <div class="csc-rows">
-            <div class="settings-row">
-              <label>Range</label>
-              <div class="range-inputs">
-                <input type="number" class="range-input cc-min" value="${cfg.min}">
-                <span class="dim">to</span>
-                <input type="number" class="range-input cc-max" value="${cfg.max}">
-              </div>
-            </div>
-            <div class="settings-row">
-              <label>Number type</label>
-              <div class="segmented cc-parity">
-                <button data-v="any" class="${cfg.parity==='any'?'active':''}">Any</button>
-                <button data-v="even" class="${cfg.parity==='even'?'active':''}">Even only</button>
-                <button data-v="odd" class="${cfg.parity==='odd'?'active':''}">Odd only</button>
-              </div>
+          <div class="settings-row">
+            <label>Range</label>
+            <div class="range-inputs">
+              <input type="number" class="range-input cc-min" value="${cfg.min}">
+              <span class="dim">to</span>
+              <input type="number" class="range-input cc-max" value="${cfg.max}">
             </div>
           </div>
-        `;
-      }
+          ${isAdd ? `
+          <div class="settings-row">
+            <label>How many numbers</label>
+            <div class="segmented cc-count">
+              <button data-v="2" class="${(cfg.count||2)===2?'active':''}">2</button>
+              <button data-v="3" class="${(cfg.count||2)===3?'active':''}">3</button>
+              <button data-v="4" class="${(cfg.count||2)===4?'active':''}">4</button>
+              <button data-v="5" class="${(cfg.count||2)===5?'active':''}">5</button>
+            </div>
+          </div>` : ''}
+          <div class="settings-row">
+            <label>Number type</label>
+            <div class="segmented cc-parity">
+              <button data-v="any" class="${cfg.parity==='any'?'active':''}">Any</button>
+              <button data-v="even" class="${cfg.parity==='even'?'active':''}">Even only</button>
+              <button data-v="odd" class="${cfg.parity==='odd'?'active':''}">Odd only</button>
+            </div>
+          </div>
+        </div>
+      `;
       challengeSkillConfigs.appendChild(card);
     });
   }
 
   // Delegated listeners for all dynamically-created config cards
   challengeSkillConfigs.addEventListener('click', (e) => {
+    const diffBtn = e.target.closest('.cc-difficulty button');
+    if(diffBtn){
+      const card = diffBtn.closest('.challenge-skill-config');
+      const key = card.dataset.skill;
+      const preset = DIFFICULTY_PRESETS[key]?.[diffBtn.dataset.v];
+      if(!preset) return;
+      [...card.querySelectorAll('.cc-difficulty button')].forEach(b => b.classList.remove('active'));
+      diffBtn.classList.add('active');
+      challengeDraftConfig[key].min = preset.min;
+      challengeDraftConfig[key].max = preset.max;
+      card.querySelector('.cc-min').value = preset.min;
+      card.querySelector('.cc-max').value = preset.max;
+      if(key === 'add' && preset.count){
+        challengeDraftConfig[key].count = preset.count;
+        card.querySelectorAll('.cc-count button').forEach(b => b.classList.toggle('active', b.dataset.v === String(preset.count)));
+      }
+      return;
+    }
+    const countBtn = e.target.closest('.cc-count button');
+    if(countBtn){
+      const card = countBtn.closest('.challenge-skill-config');
+      const key = card.dataset.skill;
+      card.querySelectorAll('.cc-count button').forEach(b => b.classList.remove('active'));
+      countBtn.classList.add('active');
+      challengeDraftConfig[key].count = parseInt(countBtn.dataset.v, 10);
+      card.querySelectorAll('.cc-difficulty button').forEach(b => b.classList.remove('active'));
+      return;
+    }
     const btn = e.target.closest('.cc-parity button');
     if(!btn) return;
     const card = btn.closest('.challenge-skill-config');
@@ -1566,10 +1734,7 @@
     if(Number.isNaN(val)) return;
     if(input.classList.contains('cc-min')) challengeDraftConfig[key].min = val;
     if(input.classList.contains('cc-max')) challengeDraftConfig[key].max = val;
-    if(input.classList.contains('cc-aMin')) challengeDraftConfig[key].aMin = val;
-    if(input.classList.contains('cc-aMax')) challengeDraftConfig[key].aMax = val;
-    if(input.classList.contains('cc-bMin')) challengeDraftConfig[key].bMin = val;
-    if(input.classList.contains('cc-bMax')) challengeDraftConfig[key].bMax = val;
+    card.querySelectorAll('.cc-difficulty button').forEach(b => b.classList.remove('active'));
   });
 
   challengeDurationToggle.addEventListener('click', (e) => {
@@ -1992,8 +2157,8 @@
   }
 
   function describeSkillConfig(key, cfg){
-    if(key === 'add2'){
-      return `${skillDisplayLabels[key]}: ${cfg.aMin}–${cfg.aMax} + ${cfg.bMin}–${cfg.bMax}, ${cfg.parity}`;
+    if(key === 'add'){
+      return `${skillDisplayLabels[key]}: ${cfg.min}–${cfg.max}, ${cfg.count || 2} numbers, ${cfg.parity}`;
     }
     return `${skillDisplayLabels[key]}: ${cfg.min}–${cfg.max}, ${cfg.parity}`;
   }
@@ -2013,7 +2178,34 @@
   }
 
   // ---------- history view ----------
-  const skillLabels = { half:'Halving', x2:'× 2', x3:'× 3', add2:'2-digit add', mixed:'Mixed' };
+  const skillLabels = { half:'Halving', x2:'× 2', x3:'× 3', add:'Additions', mixed:'Mixed' };
+
+  // One-line range/count summary for a single session's saved config, shown on its history row.
+  // Mixed rounds list each included skill's range on its own line.
+  function describeSessionConfig(s){
+    if(!s.config || !s.config.cfg) return '';
+    if(s.skill === 'mixed'){
+      const included = s.config.included || Object.keys(s.config.cfg);
+      return included.map(k => describeSkillConfig(k, s.config.cfg[k])).join(' · ');
+    }
+    return describeSkillConfig(s.skill, s.config.cfg);
+  }
+
+  // Range string for one skill's config, "min–max" or "min–max, N nums" for addition.
+  function rangeStr(key, cfg){
+    if(!cfg) return '';
+    return key === 'add' ? `${cfg.min}–${cfg.max}, ${cfg.count || 2} nums` : `${cfg.min}–${cfg.max}`;
+  }
+
+  // For the per-skill summary: if every session used the exact same range (and count,
+  // for addition), show it; otherwise say it varies rather than trying to combine them.
+  function summarizeRangeAcrossSessions(key, list){
+    const getCfg = (s) => s.skill === 'mixed' ? (s.config?.cfg?.[key]) : s.config?.cfg;
+    const strs = list.map(s => rangeStr(key, getCfg(s))).filter(Boolean);
+    if(strs.length === 0) return '';
+    const allSame = strs.every(s => s === strs[0]);
+    return allSame ? strs[0] : 'range varies';
+  }
 
   // 'all' shows every session on the chart; otherwise filters the chart + count to one skill.
   // This is chart/count display only — the per-skill improvement summary below always covers all skills.
@@ -2183,8 +2375,10 @@
         <div>
           <div class="sr-skill">${skillLabels[s.skill] || s.skill}${s.fromChallenge ? '<span class="practice-badge">Challenge</span>' : ''}</div>
           <div class="sr-date">${dateStr}</div>
+          <div class="sr-config">${describeSessionConfig(s)}</div>
         </div>
         <div class="sr-stats">
+          <span><b>${s.questions || '—'}</b> Qs</span>
           <span><b>${s.accuracy}%</b> acc</span>
           <span><b>${s.avgTime.toFixed(1)}s</b> avg</span>
           <span><b>${s.bestTime.toFixed(1)}s</b> best</span>
@@ -2233,6 +2427,8 @@
         }
       }
 
+      const rangeSummary = key === 'mixed' ? '' : summarizeRangeAcrossSessions(key, list);
+
       const row = document.createElement('div');
       row.className = 'skill-stat-row';
       row.innerHTML = `
@@ -2244,6 +2440,7 @@
           <span><b>${bestOverall.toFixed(1)}s</b> best</span>
           <span style="${trendClass==='good' ? 'color:var(--good);' : ''}"><b>${trendText}</b></span>
         </span>
+        ${rangeSummary ? `<div class="ssr-range">${rangeSummary}</div>` : ''}
       `;
       container.appendChild(row);
     });
