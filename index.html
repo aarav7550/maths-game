@@ -516,7 +516,7 @@
         <button class="theme-toggle" id="btnThemeToggle" title="Toggle theme">☾</button>
         <div class="theme-coachmark" id="themeCoachmark">
           <div class="theme-coachmark-arrow"></div>
-          <div class="theme-coachmark-text">Hate getting Flashbangs? We have a dark theme too.</div>
+          <div class="theme-coachmark-text">Hate getting flashbanged? We have a dark theme too.</div>
           <button class="theme-coachmark-close" id="btnCoachmarkClose" aria-label="Dismiss">×</button>
         </div>
       </div>
@@ -1030,16 +1030,55 @@
   }
 
   // ---------- no-repeat tracking ----------
-  // Remembers recent problem "keys" per skill so the same problem doesn't repeat back-to-back or too soon.
-  const recentProblems = { half:[], x2:[], x3:[], add2:[] };
-  const RECENT_MEMORY = 6; // how many past problems per skill to avoid repeating
-  function rememberProblem(skillKey, key){
-    const list = recentProblems[skillKey];
-    list.push(key);
-    if(list.length > RECENT_MEMORY) list.shift();
+  // Guarantees no repeated number within a round, as long as the configured range/parity
+  // has enough distinct values to support it. Tracks every value used so far this round
+  // per skill; once the pool of values matching the current config is exhausted, it resets
+  // that skill's tracking and starts a fresh no-repeat cycle (so small ranges cycle cleanly
+  // instead of getting stuck retrying forever or being allowed to hard-repeat indefinitely).
+  const usedThisRound = { half:new Set(), x2:new Set(), x3:new Set(), add2:new Set() };
+  function resetUsedTracking(){
+    Object.keys(usedThisRound).forEach(k => usedThisRound[k].clear());
   }
-  function wasRecentlyUsed(skillKey, key){
-    return recentProblems[skillKey].includes(key);
+  function countPoolSize(min, max, parity){
+    if(parity === 'any') return Math.max(0, max - min + 1);
+    let count = 0;
+    for(let i = min; i <= max; i++){
+      if(parity === 'even' && i % 2 === 0) count++;
+      if(parity === 'odd' && i % 2 !== 0) count++;
+    }
+    return count;
+  }
+  // Draws a value in [min,max] (respecting parity) that hasn't been used yet this round
+  // for the given skill. Resets that skill's used-set first if the pool is already exhausted.
+  function drawUnique(skillKey, min, max, parity){
+    const pool = countPoolSize(min, max, parity);
+    const used = usedThisRound[skillKey];
+    if(pool > 0 && used.size >= pool) used.clear();
+    let n, attempts = 0;
+    do{
+      n = randWithParity(min, max, parity);
+      attempts++;
+    } while(used.has(n) && attempts < 50);
+    used.add(n);
+    return n;
+  }
+  // add2 pairs: pool size is (count of valid a-values) x (count of valid b-values) — usually
+  // large, so this rarely resets, but stays correct if the ranges are tiny too.
+  function drawUniquePair(skillKey, aMin, aMax, bMin, bMax, parity){
+    const poolA = countPoolSize(aMin, aMax, parity);
+    const poolB = countPoolSize(bMin, bMax, parity);
+    const pool = poolA * poolB;
+    const used = usedThisRound[skillKey];
+    if(pool > 0 && used.size >= pool) used.clear();
+    let a, b, key, attempts = 0;
+    do{
+      a = randWithParity(aMin, aMax, parity);
+      b = randWithParity(bMin, bMax, parity);
+      key = a + '_' + b;
+      attempts++;
+    } while(used.has(key) && attempts < 50);
+    used.add(key);
+    return { a, b };
   }
 
   // ---------- skill generators ----------
@@ -1050,13 +1089,7 @@
         const cfg = activeConfig('half');
         let min = Math.max(1, Math.min(cfg.min, cfg.max));
         let max = Math.max(cfg.min, cfg.max);
-        let n, key, attempts = 0;
-        do{
-          n = randWithParity(min, max, cfg.parity);
-          key = 'h' + n;
-          attempts++;
-        } while(wasRecentlyUsed('half', key) && attempts < 30);
-        rememberProblem('half', key);
+        const n = drawUnique('half', min, max, cfg.parity);
         return { text: `Half of ${n}`, answer: n/2 };
       }
     },
@@ -1065,13 +1098,7 @@
       gen(){
         const cfg = activeConfig('x2');
         let min = Math.min(cfg.min, cfg.max), max = Math.max(cfg.min, cfg.max);
-        let n, key, attempts = 0;
-        do{
-          n = randWithParity(min, max, cfg.parity);
-          key = 'd' + n;
-          attempts++;
-        } while(wasRecentlyUsed('x2', key) && attempts < 30);
-        rememberProblem('x2', key);
+        const n = drawUnique('x2', min, max, cfg.parity);
         return { text: `${n} × 2`, answer: n*2 };
       }
     },
@@ -1080,13 +1107,7 @@
       gen(){
         const cfg = activeConfig('x3');
         let min = Math.min(cfg.min, cfg.max), max = Math.max(cfg.min, cfg.max);
-        let n, key, attempts = 0;
-        do{
-          n = randWithParity(min, max, cfg.parity);
-          key = 't' + n;
-          attempts++;
-        } while(wasRecentlyUsed('x3', key) && attempts < 30);
-        rememberProblem('x3', key);
+        const n = drawUnique('x3', min, max, cfg.parity);
         return { text: `${n} × 3`, answer: n*3 };
       }
     },
@@ -1096,19 +1117,13 @@
         const cfg = activeConfig('add2');
         let aMin = Math.min(cfg.aMin,cfg.aMax), aMax = Math.max(cfg.aMin,cfg.aMax);
         let bMin = Math.min(cfg.bMin,cfg.bMax), bMax = Math.max(cfg.bMin,cfg.bMax);
-        let a, b, key, attempts = 0;
-        do{
-          a = randWithParity(aMin, aMax, cfg.parity);
-          b = randWithParity(bMin, bMax, cfg.parity);
-          key = 'a' + a + '_' + b;
-          attempts++;
-        } while(wasRecentlyUsed('add2', key) && attempts < 30);
-        rememberProblem('add2', key);
+        const { a, b } = drawUniquePair('add2', aMin, aMax, bMin, bMax, cfg.parity);
         return { text: `${a} + ${b}`, answer: a+b };
       }
     }
   };
   const SKILL_ORDER = ['half','x2','x3','add2'];
+
 
   // ---------- state ----------
   let state = {
@@ -1702,7 +1717,7 @@
     }
     rng = mulberry32(state.seed);
 
-    Object.keys(recentProblems).forEach(k => recentProblems[k] = []); // fresh no-repeat window per round
+    resetUsedTracking(); // fresh no-repeat tracking per round
 
     topStreak.style.display = 'flex';
     topStreakNum.textContent = '0';
