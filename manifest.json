@@ -1,7 +1,7 @@
 {
   "name": "Numbers — Mental Math Drills",
-  "short_name": "Numbers",
-  "description": "Gamified mental math drills for CAT prep — track your speed and accuracy over time.",
+  "short_name": "Foxy",
+  "description": "Gamified mental math drills for CAT prep — Get smart like a fox",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
