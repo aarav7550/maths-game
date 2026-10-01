@@ -11,8 +11,11 @@
 // Loaded AFTER ui.js (any position after it is fine).
 // ============================================================
 (function(){
-  const OPEN_MS  = 220;
-  const CLOSE_MS = 150;
+  // Phone timings stay as they were; desktop (same 641px breakpoint as style.css) is quicker.
+  const DESKTOP = window.matchMedia('(min-width:641px)');
+  const T = () => DESKTOP.matches
+    ? { open:180, close:120, fade:120, pop:140, popClose:100 }
+    : { open:220, close:150, fade:140, pop:170, popClose:120 };
   const EASE_OUT = 'cubic-bezier(.22,.7,.25,1)';
   const EASE_IN  = 'cubic-bezier(.4,0,.6,1)';
 
@@ -40,6 +43,15 @@
     return `translate(${dx}px, ${dy}px) scale(${target.width / box.width}, ${target.height / box.height})`;
   }
 
+  // Desktop only: tell the browser the popup is about to move, so it keeps it on its own GPU layer for the
+  // whole animation instead of repainting it every frame (this is what makes the motion smooth, not just fast).
+  function layerUp(ov, box){
+    if(!DESKTOP.matches) return () => {};
+    ov.style.willChange = 'opacity';
+    box.style.willChange = 'transform, opacity';
+    return () => { ov.style.willChange = ''; box.style.willChange = ''; };
+  }
+
   function animateOpen(ov){
     ov.classList.remove('closing');
     ov.getAnimations({ subtree:true }).forEach(a => a.cancel());   // reopened mid-close
@@ -50,26 +62,38 @@
     const src = (ORIGIN_OVERLAYS.has(ov.id) && lastOrigin && performance.now() - lastOriginAt < 500) ? lastOrigin : null;
     originOf.set(ov, src);
 
-    ov.animate([{ opacity:0 }, { opacity:1 }], { duration:140, easing:'ease-out' });
+    const release = layerUp(ov, box);
+    const anims = [ov.animate([{ opacity:0 }, { opacity:1 }], { duration:T().fade, easing:'ease-out' })];
 
     const from = src && src.isConnected ? src.getBoundingClientRect() : null;
     if(usable(from)){
       const to = box.getBoundingClientRect();
-      box.animate(
-        [{ transformOrigin:'0 0', transform:squeezeInto(from, to) }, { transformOrigin:'0 0', transform:'none' }],
-        { duration:OPEN_MS, easing:EASE_OUT }
-      );
-      // contents stay hidden while the box is still small, so they never look stretched
-      [...box.children].forEach(c => c.animate(
-        [{ opacity:0 }, { opacity:0, offset:.3 }, { opacity:1 }],
-        { duration:OPEN_MS, easing:'linear' }
-      ));
+      if(DESKTOP.matches){
+        // desktop: ONE animation on the box (squeeze + fade-in) instead of one per child, far cheaper to draw
+        anims.push(box.animate(
+          [{ transformOrigin:'0 0', transform:squeezeInto(from, to), opacity:0 },
+           { opacity:1, offset:.55 },
+           { transformOrigin:'0 0', transform:'none', opacity:1 }],
+          { duration:T().open, easing:EASE_OUT }
+        ));
+      } else {
+        anims.push(box.animate(
+          [{ transformOrigin:'0 0', transform:squeezeInto(from, to) }, { transformOrigin:'0 0', transform:'none' }],
+          { duration:T().open, easing:EASE_OUT }
+        ));
+        // contents stay hidden while the box is still small, so they never look stretched
+        [...box.children].forEach(c => anims.push(c.animate(
+          [{ opacity:0 }, { opacity:0, offset:.3 }, { opacity:1 }],
+          { duration:T().open, easing:'linear' }
+        )));
+      }
     } else {
-      box.animate(
+      anims.push(box.animate(
         [{ opacity:0, transform:'translateY(14px) scale(.94)' }, { opacity:1, transform:'none' }],
-        { duration:170, easing:EASE_OUT }
-      );
+        { duration:T().pop, easing:EASE_OUT }
+      ));
     }
+    Promise.all(anims.map(a => a.finished)).then(release, release);
   }
 
   function animateClose(ov){
@@ -82,30 +106,41 @@
     // Home is hidden by the time a round starts, so its rect is empty -> plain fade below
     const target = src && src.isConnected ? src.getBoundingClientRect() : null;
     const anims = [];
+    const release = layerUp(ov, box);
 
     if(usable(target)){
       const from = box.getBoundingClientRect();
-      anims.push(ov.animate([{ opacity:1 }, { opacity:0 }], { duration:CLOSE_MS, easing:'ease-in', fill:'forwards' }));
-      anims.push(box.animate(
-        [{ transformOrigin:'0 0', transform:'none' }, { transformOrigin:'0 0', transform:squeezeInto(target, from) }],
-        { duration:CLOSE_MS, easing:EASE_IN, fill:'forwards' }
-      ));
-      [...box.children].forEach(c => anims.push(c.animate(
-        [{ opacity:1 }, { opacity:0, offset:.5 }, { opacity:0 }],
-        { duration:CLOSE_MS, easing:'linear', fill:'forwards' }
-      )));
+      anims.push(ov.animate([{ opacity:1 }, { opacity:0 }], { duration:T().close, easing:'ease-in', fill:'forwards' }));
+      if(DESKTOP.matches){
+        anims.push(box.animate(
+          [{ transformOrigin:'0 0', transform:'none', opacity:1 },
+           { opacity:0, offset:.6 },
+           { transformOrigin:'0 0', transform:squeezeInto(target, from), opacity:0 }],
+          { duration:T().close, easing:EASE_IN, fill:'forwards' }
+        ));
+      } else {
+        anims.push(box.animate(
+          [{ transformOrigin:'0 0', transform:'none' }, { transformOrigin:'0 0', transform:squeezeInto(target, from) }],
+          { duration:T().close, easing:EASE_IN, fill:'forwards' }
+        ));
+        [...box.children].forEach(c => anims.push(c.animate(
+          [{ opacity:1 }, { opacity:0, offset:.5 }, { opacity:0 }],
+          { duration:T().close, easing:'linear', fill:'forwards' }
+        )));
+      }
     } else {
-      anims.push(ov.animate([{ opacity:1 }, { opacity:0 }], { duration:120, easing:'ease-in', fill:'forwards' }));
+      anims.push(ov.animate([{ opacity:1 }, { opacity:0 }], { duration:T().popClose, easing:'ease-in', fill:'forwards' }));
       anims.push(box.animate(
         [{ opacity:1, transform:'none' }, { opacity:0, transform:'translateY(10px) scale(.96)' }],
-        { duration:120, easing:'ease-in', fill:'forwards' }
+        { duration:T().popClose, easing:'ease-in', fill:'forwards' }
       ));
     }
 
     Promise.all(anims.map(a => a.finished)).then(() => {
       anims.forEach(a => a.cancel());
+      release();
       if(!ov.classList.contains('show')) ov.classList.remove('closing');
-    }).catch(() => {});                    // cancelled by a quick reopen: nothing to clean up
+    }).catch(() => { release(); });                    // cancelled by a quick reopen: nothing to clean up
   }
 
   const observer = new MutationObserver((mutations) => {

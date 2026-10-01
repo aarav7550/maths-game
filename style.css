@@ -406,7 +406,7 @@
     display:flex; align-items:center; justify-content:center;
     transition:border-color .12s ease, color .12s ease, background .12s ease;
   }
-  .info-btn:hover .info-dot{ border-color:var(--sc); color:#fff; background:var(--sc); }
+  @media (hover:hover){ .info-btn:hover .info-dot{ border-color:var(--sc); color:#fff; background:var(--sc); } }
 
   .info-note{
     position:fixed; z-index:200; width:210px;
@@ -417,7 +417,8 @@
     pointer-events:none;
     top:0; left:0;
   }
-  .info-btn:hover .info-note, .info-note.open{ opacity:1; visibility:visible; transform:translateY(0); pointer-events:auto; }
+  .info-note.open{ opacity:1; visibility:visible; transform:translateY(0); pointer-events:auto; }
+  @media (hover:hover){ .info-btn:hover .info-note{ opacity:1; visibility:visible; transform:translateY(0); pointer-events:auto; } }
   .info-note b{ color:var(--sc); }
   .info-note .in-arrow{
     position:absolute; top:-5px; width:10px; height:10px;
@@ -1274,9 +1275,10 @@
   #view-challenge .cc-diff-opt .cc-do-range{ font-size:10px; color:var(--text-dim); margin-top:2px; }
   #view-challenge .cc-info-btn{ position:absolute; top:0; right:0; bottom:0; width:28px; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer; padding:0; }
   #view-challenge .cc-info-btn .cc-info-dot{ width:16px; height:16px; border-radius:50%; border:1.5px solid var(--text-faint); color:var(--text-faint); font-family:'Sora', sans-serif; font-weight:700; font-size:9.5px; display:flex; align-items:center; justify-content:center; transition:border-color .12s ease, color .12s ease, background .12s ease; }
-  #view-challenge .cc-info-btn:hover .cc-info-dot{ border-color:var(--sc); color:#fff; background:var(--sc); }
+  @media (hover:hover){ #view-challenge .cc-info-btn:hover .cc-info-dot{ border-color:var(--sc); color:#fff; background:var(--sc); } }
   #view-challenge .cc-info-note{ position:fixed; z-index:200; width:200px; background:var(--navy-1); color:#fff; border-radius:11px; padding:11px 13px; font-size:11.5px; line-height:1.5; box-shadow:0 12px 28px rgba(0,0,0,0.22); opacity:0; visibility:hidden; transform:translateY(4px); transition:opacity .14s ease, transform .14s ease; pointer-events:none; top:0; left:0; }
-  #view-challenge .cc-info-btn:hover .cc-info-note, #view-challenge .cc-info-note.open{ opacity:1; visibility:visible; transform:translateY(0); pointer-events:auto; }
+  #view-challenge .cc-info-note.open{ opacity:1; visibility:visible; transform:translateY(0); pointer-events:auto; }
+  @media (hover:hover){ #view-challenge .cc-info-btn:hover .cc-info-note{ opacity:1; visibility:visible; transform:translateY(0); pointer-events:auto; } }
   #view-challenge .cc-info-note b{ color:var(--feature-accent); font-weight:700; }
   #view-challenge .cc-info-note .cc-in-arrow{ position:absolute; top:-5px; width:10px; height:10px; background:var(--navy-1); transform:rotate(45deg); border-radius:2px; left:50%; margin-left:-5px; }
   #view-challenge .cc-custom-editor{ display:none; margin-top:12px; padding-top:12px; border-top:1px solid var(--border-soft); }
@@ -1528,7 +1530,6 @@
    ============================================================ */
 #view-about, #view-bug{
   flex-direction:column; overflow-y:auto;
-  --tg:#26A5E4; --tg-soft:#E9F6FD; --dc:#5865F2; --dc-soft:#EEF0FE;
 }
 #view-about .ab-page, #view-bug .bug-page{ width:100%; margin:0 auto; padding:20px 20px 60px; flex:1 0 auto; display:flex; flex-direction:column; }
 #view-about .ab-page{ max-width:640px; }
@@ -1561,15 +1562,18 @@
 #view-about .ab-footer{ text-align:center; font-size:12px; color:var(--ink-dim); margin-top:8px; line-height:1.6; }
 
 /* Bug-only */
-#view-bug .bug-contact{ display:flex; align-items:center; gap:14px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:12px; cursor:pointer; text-decoration:none; transition:border-color .15s ease; }
-#view-bug .bug-contact:hover{ border-color:var(--ink-dim); }
-#view-bug .bug-icon{ width:42px; height:42px; border-radius:11px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
-#view-bug .bug-icon svg{ width:22px; height:22px; }
-#view-bug .bug-body{ flex:1; min-width:0; }
-#view-bug .bug-name{ font-family:'Sora',sans-serif; font-weight:700; font-size:14.5px; color:var(--ink); margin-bottom:2px; }
-#view-bug .bug-handle{ font-size:12.5px; color:var(--ink-dim); }
-#view-bug .bug-arrow{ color:var(--ink-dim); flex-shrink:0; }
-#view-bug .bug-arrow svg{ width:18px; height:18px; display:block; }
+#view-bug .bug-form{ display:flex; flex-direction:column; gap:14px; }
+#view-bug .bug-field label{ display:block; font-size:12.5px; font-weight:600; color:var(--ink); margin-bottom:6px; }
+#view-bug .bug-hint{ font-weight:500; color:var(--ink-dim); margin-left:4px; }
+#view-bug .bug-field input, #view-bug .bug-field textarea{ width:100%; box-sizing:border-box; background:var(--bg); border:1.5px solid var(--line); border-radius:10px; color:var(--ink); font-family:'Inter',sans-serif; padding:11px 13px; outline:none; transition:border-color .15s ease, box-shadow .15s ease; }
+#view-bug .bug-field input:focus, #view-bug .bug-field textarea:focus{ border-color:var(--primary); box-shadow:0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent); }
+#view-bug .bug-field textarea{ resize:none; overflow:hidden; min-height:110px; line-height:1.5; }
+#view-bug .bug-trap{ display:none; }
+#view-bug .bug-status{ display:none; font-size:12.5px; font-weight:600; line-height:1.45; padding:9px 12px; border-radius:9px; }
+#view-bug .bug-status.ok{ display:block; color:var(--sk-x2); background:var(--sk-x2-soft); }
+#view-bug .bug-status.err{ display:block; color:var(--bad); background:var(--bad-soft); }
+#view-bug .bug-send{ width:100%; background:var(--primary); color:#fff; border:none; border-radius:11px; font-family:'Sora',sans-serif; font-weight:700; padding:13px; cursor:pointer; transition:opacity .15s ease; }
+#view-bug .bug-send:disabled{ opacity:.6; cursor:default; }
 #view-bug .bug-tips{ margin-top:8px; padding:18px 20px; }
 
 /* desktop only */
@@ -1580,6 +1584,9 @@
   #view-bug .pg-hero{ padding:28px 26px; }
   #view-bug .pg-hero-title{ font-size:21px; margin-bottom:8px; }
   #view-bug .pg-hero-desc{ font-size:13.5px; }
+  #view-bug .bug-field input, #view-bug .bug-field textarea{ font-size:14px; }
+  #view-bug .bug-send{ font-size:14px; }
+  @media (hover:hover){ #view-bug .bug-send:hover:not(:disabled){ opacity:.9; } }
 }
 /* phone only */
 @media (max-width: 640px){
@@ -1588,6 +1595,19 @@
   #view-about .pg-hero-title{ font-size:22px; }
   #view-bug .pg-hero-title{ font-size:19px; margin-bottom:8px; }
   #view-about .pg-hero-desc, #view-bug .pg-hero-desc{ font-size:13.5px; }
+  #view-bug .bug-field input, #view-bug .bug-field textarea{ font-size:16px; }   /* 16px stops iOS zooming into the field */
+  #view-bug .bug-send{ font-size:15px; }
+}
+
+/* ---- Enter Code on phones: when the keyboard opens/closes the app height changes and the card (centred in the
+   leftover space) used to jump; animating the height makes it glide instead. Phone only. ---- */
+@media (max-width: 640px){
+  #app:has(#view-entercode.active){ transition:height .22s ease-out; }
+}
+
+/* ---- desktop only: the 2px backdrop blur on a full-screen overlay makes popup fades stutter on many GPUs ---- */
+@media (min-width: 641px){
+  .modal-overlay{ -webkit-backdrop-filter:none; backdrop-filter:none; }
 }
 
 /* ---- touchscreens only: no blue tap-flash / text-selection highlight on buttons and cards ---- */

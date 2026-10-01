@@ -6,7 +6,6 @@
 //   skills.js     SKILLS, state, showView()
 //   game.js       startRound()
 //   ui.js         practiceCheckbox
-//   challenge.js  keepFieldClearOfKeyboard()   (shared keyboard-scroll helper)
 //
 // Wrapped in one function so its names can't clash with globals. All of this screen's
 // ids/classes are prefixed ec / ec- (the old popup used challengeEnter* names).
@@ -26,6 +25,8 @@
   const btnView = document.getElementById('ecBtnView');
   const homeEnterBtn = document.getElementById('challengeEnterBtn');
 
+  const FOCUS_DELAY_MS = 300;   // wait after opening the page before the field is focused (slide-in is 300ms)
+  let focusTimer = 0;
   let busy = false;   // true while the success sweep plays, so a second tap / Enter can't double-submit
 
   // ---------- validation (real decoder, replaces the mockup's "123" check) ----------
@@ -79,10 +80,7 @@
     if(shell.classList.contains('success')) clearSuccess();
   });
 
-  // ---------- keyboard: same shared helper the Create screen uses ----------
-  document.addEventListener('focusin', (e) => {
-    if(e.target === input) keepFieldClearOfKeyboard(view, input);
-  });
+  // (No keyboard-scroll helper on this screen: the field already sits at the top, nothing needs to scroll.)
 
   // ---------- success sweep: fixed total time, so a 300-character code isn't slow ----------
   const SWEEP_TOTAL_MS = 140;
@@ -148,6 +146,11 @@
     clearSuccess();
     btnView.disabled = true;
     showView('entercode');
+    // Let the slide-in finish first, then focus the field (this is what raises the keyboard).
+    clearTimeout(focusTimer);
+    focusTimer = setTimeout(() => {
+      if(view.classList.contains('active') && !busy) input.focus({ preventScroll:true });
+    }, FOCUS_DELAY_MS);
   }
   window.openEnterCodeScreen = openEnterCodeScreen;
 

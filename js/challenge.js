@@ -381,20 +381,25 @@
     const token = ++kbToken;                      // a newer focus cancels an older pending scroll
     const vv = window.visualViewport;
     const heightNow = () => vv ? vv.height : window.innerHeight;
+    const panNow = () => vv ? vv.offsetTop : 0;   // how far the browser has panned the visible area down to reveal the field
     const MIN_WAIT = 200, QUIET = 120, MAX_WAIT = 800;
     const start = performance.now();
-    let lastH = heightNow(), lastChange = start;
+    let lastH = heightNow(), lastPan = panNow(), lastChange = start;
     const timer = setInterval(() => {
       if(token !== kbToken || document.activeElement !== field){ clearInterval(timer); return; }
       const now = performance.now();
-      const h = heightNow();
-      if(Math.abs(h - lastH) > 0.5){ lastH = h; lastChange = now; }
+      const h = heightNow(), pan = panNow();
+      if(Math.abs(h - lastH) > 0.5 || Math.abs(pan - lastPan) > 0.5){ lastH = h; lastPan = pan; lastChange = now; }
       const settled = now - start >= MIN_WAIT && now - lastChange >= QUIET;
       if(!settled && now - start < MAX_WAIT) return;
       clearInterval(timer);
+      // WHY IT OVERSHOT on the lowest field: the browser also pans the visible area down (vv.offsetTop) to
+      // reveal it, so measuring from the screen's top edge aimed too high. Measure inside what is really visible.
       const sRect = scroller.getBoundingClientRect();
-      const visibleH = Math.min(scroller.clientHeight, h - sRect.top);
-      const delta = field.getBoundingClientRect().top - sRect.top - visibleH * 0.4;
+      const areaTop = Math.max(sRect.top, pan);
+      const areaBottom = Math.min(sRect.bottom, pan + h);
+      const visibleH = areaBottom - areaTop;
+      const delta = field.getBoundingClientRect().top - (areaTop + visibleH * 0.4);
       if(Math.abs(delta) > 2) scroller.scrollBy({ top: delta, behavior: 'smooth' });
     }, 40);
   };
