@@ -29,12 +29,17 @@
     if(nameOv && nameOv.classList.contains('show')){ closeNameEditor(); return true; }
     const exitOv = document.getElementById('exitModal');
     if(exitOv && exitOv.classList.contains('show')){ document.getElementById('btnCancelExit').click(); return true; }
+    const hintOv = document.getElementById('decimalHintModal');
+    if(hintOv && hintOv.classList.contains('show')){ window.dismissDecimalHint(); return true; }
     const diffOv = document.getElementById('diffModalOverlay');
     if(diffOv && diffOv.classList.contains('show')){ closeDifficultyPicker(); return true; }
     for(const id of ['mixedSoonModal','challengeShowModal','challengeEnterModal','settingsModal']){
       const el = document.getElementById(id);
       if(el && el.classList.contains('show')){ el.classList.remove('show'); return true; }
     }
+    // safety net: any other popup that is open (so Esc really closes "all" popups)
+    const other = [...document.querySelectorAll('.modal-overlay.show')].pop();
+    if(other){ other.classList.remove('show'); return true; }
     return false;
   }
 
@@ -184,6 +189,25 @@
   ['btnHistoryBack','btnSkdBack','btnFullBack','btnChallengeBack','btnEnterCodeBack','btnChallengeDetailsBack','btnAboutBack','btnBugBack'].forEach(id => {
     const b = document.getElementById(id);
     if(b) b.addEventListener('click', appBack);
+  });
+
+  // ---- Esc key (desktop) ----
+  // 1) closes the top-most open popup (the exit popup counts as "Stay")
+  // 2) during a round, opens the "Leave this round?" popup (never leaves by itself)
+  // 3) otherwise acts as the Back button, like the in-app back arrows
+  document.addEventListener('keydown', (e) => {
+    if(e.key !== 'Escape' || e.repeat || e.isComposing || e.defaultPrevented) return;
+    if(e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    if(t && t.id === 'nameInput') return;   // the name editor handles its own Esc
+    if(closeTopPopup()){ e.preventDefault(); return; }
+    const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && t.id !== 'answerInput';
+    if(typing){ t.blur(); return; }          // first Esc just leaves the box, so typed text isn't lost
+    if(currentView === 'play' && typeof state !== 'undefined' && state.running){
+      document.getElementById('btnExitRound').click();
+      return;
+    }
+    if(currentView !== 'home') appBack();
   });
 
   // ---- initial entries: [sentinel] then [home] ----

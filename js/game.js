@@ -41,8 +41,57 @@ function endRoundAbruptly(){
   btnHistory.disabled = false;
 }
 
+// ---------- one-time "no need to type the decimal point" hint ----------
+// Shown the first time each applicable skill (Halving, Additions) is played, then never again
+// on that device. Add `hasDecimals: true` to a skill in skills.js to include it.
+const DECIMAL_HINT_KEY = 'numbers_decimalHintSeen';
+const DECIMAL_HINT_EXAMPLES = {
+  half: { q: 'Half of 483', a: '241.5', whole: '241', rest: '5' },
+  add:  { q: '12.5 + 3.7',  a: '16.2',  whole: '16',  rest: '2' },
+  recip:{ q: '1/8 in %',    a: '12.5',  whole: '12',  rest: '5' }
+};
+const decimalHintModal = document.getElementById('decimalHintModal');
+const hintShownThisSession = {};   // backup in case localStorage is blocked
+
+function savedDecimalHints(){
+  try { return JSON.parse(localStorage.getItem(DECIMAL_HINT_KEY)) || {}; } catch(e){ return {}; }
+}
+function roundSkillKeys(){
+  if(pendingChallenge) return pendingChallenge.included;
+  if(state.skill === 'mixed') return includedSkillList();
+  return [state.skill];
+}
+function unseenDecimalSkills(){
+  const saved = savedDecimalHints();
+  return roundSkillKeys().filter(k => SKILLS[k] && SKILLS[k].hasDecimals && !saved[k] && !hintShownThisSession[k]);
+}
+function showDecimalHint(skills){
+  const ex = DECIMAL_HINT_EXAMPLES[skills[0]] || DECIMAL_HINT_EXAMPLES.half;
+  document.getElementById('dhQ').textContent = ex.q;
+  document.getElementById('dhA').textContent = ex.a;
+  document.getElementById('dhWhole').textContent = ex.whole;
+  document.getElementById('dhRest').textContent = ex.rest;
+  decimalHintModal.dataset.skills = skills.join(',');
+  decimalHintModal.classList.add('show');
+}
+function closeDecimalHint(thenStart){
+  const skills = (decimalHintModal.dataset.skills || '').split(',').filter(Boolean);
+  const saved = savedDecimalHints();
+  skills.forEach(k => { saved[k] = true; hintShownThisSession[k] = true; });
+  try { localStorage.setItem(DECIMAL_HINT_KEY, JSON.stringify(saved)); } catch(e){}
+  decimalHintModal.classList.remove('show');
+  if(thenStart) startRound();   // the round that was waiting for the hint starts now
+}
+document.getElementById('btnDecimalHintOk').addEventListener('click', () => closeDecimalHint(true));
+// Esc / system Back on the hint (nav.js): counts as seen, but doesn't start a timed round by accident.
+window.dismissDecimalHint = () => closeDecimalHint(false);
+
 // ---------- round logic ----------
 function startRound(){
+  // First time on a skill with decimal answers: show the hint first, round starts after "Got it".
+  const hintSkills = unseenDecimalSkills();
+  if(hintSkills.length){ showDecimalHint(hintSkills); return; }
+
   state.currentIndex = 0;
   state.correctCount = 0;
   state.times = [];
@@ -99,6 +148,12 @@ function pickSkillKey(){
   return state.skill;
 }
 
+// A problem may accept several answers (e.g. 16.66 or 16.67): problem.answers lists them all.
+function matchesAnswer(problem, value){
+  const list = problem.answers || [problem.answer];
+  return list.some(a => value === a);
+}
+
 function nextQuestion(){
   if(state.currentIndex >= state.totalQuestions){
     finishRound();
@@ -146,13 +201,29 @@ function runTimerBar(){
 }
 
 // ---------- live-checking input ----------
-answerInput.addEventListener('input', () => {
+answerInput.addEventListener('input', (e) => {
   if(!state.running || state.awaitingAdvance) return;
-  const raw = answerInput.value.trim();
+  let raw = answerInput.value.trim();
+  // Only one decimal point allowed: if a second one is typed (e.g. after the auto-added one),
+  // drop it and keep the first.
+  const firstDot = raw.indexOf('.');
+  if(firstDot !== -1 && raw.indexOf('.', firstDot + 1) !== -1){
+    raw = raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/\./g, '');
+    answerInput.value = raw;
+  }
   if(raw === '' || raw === '-') return;
   const value = Number(raw);
-  if(!Number.isNaN(value) && value === state.currentProblem.answer){
+  const answer = state.currentProblem.answer;
+  if(!Number.isNaN(value) && matchesAnswer(state.currentProblem, value)){
     lockInAnswer(value);
+    return;
+  }
+  // Auto-decimal (iPhone numpads have no "."): if the answer has decimals and the whole
+  // number typed so far is exactly the answer's whole-number part, add the point for them.
+  // Skipped while deleting, otherwise the player could never backspace over the point.
+  const deleting = e && e.inputType && e.inputType.indexOf('delete') === 0;
+  if(!deleting && !Number.isInteger(answer) && /^\d+$/.test(raw) && value === Math.trunc(answer)){
+    answerInput.value = raw + '.';
   }
 });
 
@@ -172,13 +243,14 @@ function lockInAnswer(value){
   if(state.perSkillTimer) clearTimeout(state.perSkillTimer);
 
   const elapsed = performance.now() - state.questionStart;
-  const correct = value !== null && !Number.isNaN(value) && Number(value) === state.currentProblem.answer;
+  const correct = value !== null && !Number.isNaN(value) && matchesAnswer(state.currentProblem, Number(value));
 
   state.times.push(elapsed);
   state.records.push({
     skillKey: state.currentSkillKey,
     text: state.currentProblem.text,
     answer: state.currentProblem.answer,
+    answerText: state.currentProblem.answerText || null,
     given: (value === null || Number.isNaN(value)) ? null : value,
     correct: correct,
     timeMs: elapsed
@@ -191,7 +263,7 @@ function lockInAnswer(value){
     state.streak = 0;
     answerInput.classList.add('flash-bad');
     problemText.classList.add('shake');
-    correctRevealNum.textContent = state.currentProblem.answer;
+    correctRevealNum.textContent = state.currentProblem.answerText || state.currentProblem.answer;
     correctReveal.classList.add('show');
   }
   // TODO (Step 3b): update streak display in Play's meta-chip row here
@@ -322,7 +394,7 @@ function renderResultsBreakdown(){
       const youStr = r.given === null ? 'no answer' : String(r.given);
       row.innerHTML = `
         <span class="dr-problem">${r.text}${tag(r)}</span>
-        <span class="miss-nums"><span class="you">you: ${youStr}</span><span class="correct">right: ${r.answer}</span></span>
+        <span class="miss-nums"><span class="you">you: ${youStr}</span><span class="correct">right: ${r.answerText || r.answer}</span></span>
       `;
       missedList.appendChild(row);
     });
@@ -337,6 +409,9 @@ function describeSkillConfig(key, cfg){
   const diff = difficultyLabels[matchingDifficultyForConfig(key, cfg)];
   if(key === 'add'){
     return `${skillDisplayLabels[key]}: ${diff} (${cfg.min}–${cfg.max}, ${cfg.count || 2} numbers, ${cfg.parity})`;
+  }
+  if(key === 'recip'){
+    return `${skillDisplayLabels[key]}: ${diff} (${cfg.mode === 'rev' ? '% → fraction' : 'fraction → %'})`;
   }
   return `${skillDisplayLabels[key]}: ${diff} (${cfg.min}–${cfg.max}, ${cfg.parity})`;
 }

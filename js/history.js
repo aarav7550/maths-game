@@ -7,7 +7,7 @@
 // matchingDifficultyForConfig), trendchart.js (TrendChart).
 // ============================================================
 
-const historySkillLabels = { half:'Halving', x2:'× 2', x3:'× 3', add:'Additions', mixed:'Mixed' };
+const historySkillLabels = { half:'Halving', x2:'× 2', x3:'× 3', add:'Additions', sq:'Square', cube:'Cube', table:'Tables', recip:'Reciprocals', mixed:'Mixed' };
 const PARITY_LABEL = { any:'Any', even:'Even only', odd:'Odd only' };
 const FULL_PAGE_SIZE = 15;
 
@@ -42,7 +42,7 @@ function sessionLevelInfo(s){
   return {
     label: difficultyLabels[matchingDifficultyForConfig(s.skill, cfg)],
     range: cfg.min + '–' + cfg.max,
-    type: PARITY_LABEL[cfg.parity] || 'Any'
+    type: s.skill === 'recip' ? (cfg.mode === 'rev' ? '% → Fraction' : 'Fraction → %') : (PARITY_LABEL[cfg.parity] || 'Any')
   };
 }
 

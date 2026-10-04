@@ -103,6 +103,25 @@
       </div>`;
     }
 
+    // Only the levels this skill has presets for, plus Custom unless the skill opts out
+    // (DIFF_ORDER / NO_CUSTOM live in ui.js). Two buttons per row; an odd one out gets its own row.
+    const customPill = `
+          <button class="cc-diff-opt ${isCustom ? 'active' : ''}" data-level="custom">
+            <div class="cc-do-name">Custom</div>
+            <div class="cc-do-range">Set your own</div>
+            <span class="cc-info-btn">
+              <span class="cc-info-dot">i</span>
+              <span class="cc-info-note"><span class="cc-in-arrow"></span>${CUSTOM_NOTE[skillId] || ''}</span>
+            </span>
+          </button>`;
+    const pills = DIFF_ORDER.filter(l => DIFFICULTY_PRESETS[skillId][l]).map(pillHtml);
+    if(!NO_CUSTOM[skillId]) pills.push(customPill);
+    let rowsHtml = '';
+    for(let i = 0; i < pills.length; i += 2){
+      const chunk = pills.slice(i, i + 2);
+      rowsHtml += `<div class="cc-diff-row ${chunk.length === 2 ? 'pair' : 'single'}">${chunk.join('')}</div>`;
+    }
+
     const card = document.createElement('div');
     card.className = 'cc-config-card';
     card.dataset.skill = skillId;
@@ -112,18 +131,7 @@
         <button class="cc-config-reset" data-reset="${skillId}">Reset</button>
       </div>
       <div class="cc-diff-rows">
-        <div class="cc-diff-row pair">${pillHtml('veryeasy')}${pillHtml('easy')}</div>
-        <div class="cc-diff-row pair">${pillHtml('difficult')}${pillHtml('verydifficult')}</div>
-        <div class="cc-diff-row single">
-          <button class="cc-diff-opt ${isCustom ? 'active' : ''}" data-level="custom">
-            <div class="cc-do-name">Custom</div>
-            <div class="cc-do-range">Set your own</div>
-            <span class="cc-info-btn">
-              <span class="cc-info-dot">i</span>
-              <span class="cc-info-note"><span class="cc-in-arrow"></span>${CUSTOM_NOTE[skillId]}</span>
-            </span>
-          </button>
-        </div>
+        ${rowsHtml}
       </div>
       <div class="cc-custom-editor ${isCustom ? 'show' : ''}">
         <div class="cc-config-rows">${rows}</div>
@@ -167,6 +175,7 @@
       card.querySelectorAll('[data-seg="parity"] button').forEach(b => b.classList.remove('active'));
       parityBtn.classList.add('active');
       config[skillId].custom.parity = parityBtn.dataset.v;
+      updateFooter();
       return;
     }
 
@@ -296,7 +305,9 @@
   });
   qcountInline.addEventListener('click', (e) => e.stopPropagation());
   qcountInline.addEventListener('input', () => {
-    const v = parseInt(qcountInline.value, 10);
+    let v = parseInt(qcountInline.value, 10);
+    const max = maxQuestionsAllowed();
+    if(v > max){ v = max; qcountInline.value = max; }
     if(v > 0){ questionCount = v; updateFooter(); }
   });
 
@@ -314,7 +325,44 @@
     });
   }
 
+  // The most questions the chosen skills can give without repeating a number (their pools added
+  // together, since a mixed set spreads its questions across the skills).
+  function maxQuestionsAllowed(){
+    if(selected.size === 0) return Infinity;
+    let total = 0;
+    for(const id of SKILL_ORDER_LOCAL){
+      if(!selected.has(id)) continue;
+      const cfg = resolveConfig(id);
+      if(!Number.isFinite(cfg.min) || !Number.isFinite(cfg.max) || cfg.min >= cfg.max) return Infinity;  // invalid custom: Generate is blocked anyway
+      total += questionPoolSize(id, cfg);
+    }
+    return total;
+  }
+  // Greys out (and disables) question counts that are too big for the chosen skills.
+  function applyQcountLimits(){
+    const max = maxQuestionsAllowed();
+    const opts = [...qcountBar.querySelectorAll('.cc-qcount-opt')].filter(o => o !== qcountCustomBtn);
+    opts.forEach(o => { o.disabled = parseInt(o.dataset.n, 10) > max; });
+    qcountInline.max = Number.isFinite(max) ? max : '';
+    if(questionCount > max){
+      const ok = opts.filter(o => !o.disabled).pop();
+      qcountBar.querySelectorAll('.cc-qcount-opt').forEach(o => o.classList.remove('active'));
+      if(ok){
+        ok.classList.add('active');
+        qcountCustomBtn.classList.remove('expanded');
+        qcountBar.classList.remove('custom-active');
+        questionCount = parseInt(ok.dataset.n, 10);
+      } else {
+        qcountCustomBtn.classList.add('active', 'expanded');
+        qcountBar.classList.add('custom-active');
+        qcountInline.value = max;
+        questionCount = max;
+      }
+    }
+  }
+
   function updateFooter(){
+    applyQcountLimits();
     const n = selected.size;
     const invalid = n > 0 && customIsInvalid();
     btnGenerate.disabled = (n === 0) || invalid;
@@ -356,6 +404,7 @@
     const p = DIFFICULTY_PRESETS[skillId][c.level];
     const out = { min: p.min, max: p.max, parity: 'any' };
     if(isAdd) out.count = p.count;
+    if(p.mode) out.mode = p.mode;
     return out;
   }
 

@@ -28,7 +28,7 @@
   const summaryEst = document.getElementById('cdSummaryEst');
   const btnStart = document.getElementById('cdBtnStart');
 
-  const SHORT_ICON = { half:'÷2', x2:'×2', x3:'×3', add:'+' };
+  const SHORT_ICON = SKILL_ICON;   // one shared icon list (ui.js)
   const PARITY_LABEL = { any:'Any', even:'Even only', odd:'Odd only' };
 
   let current = null;   // the decoded payload being shown
@@ -50,7 +50,10 @@
 
     let rows = `
       <div class="cd-row"><span class="cd-label">Range</span><span class="cd-value">${cfg.min}–${cfg.max}</span></div>`;
-    if(!isAdd){
+    if(skillId === 'recip'){
+      rows += `
+      <div class="cd-row"><span class="cd-label">Direction</span><span class="cd-value">${cfg.mode === 'rev' ? '% → Fraction' : 'Fraction → %'}</span></div>`;
+    } else if(!isAdd){
       rows += `
       <div class="cd-row"><span class="cd-label">Number type</span><span class="cd-value">${PARITY_LABEL[cfg.parity] || PARITY_LABEL.any}</span></div>`;
     } else {

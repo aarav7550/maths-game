@@ -17,8 +17,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Numbers">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -119,36 +117,14 @@
       <!-- skill cards rendered by js/ui.js from SKILL_ORDER + real session stats -->
     </div>
 
-    <div class="section-label">Powers &amp; Roots · coming soon</div>
-    <div class="skill-grid">
-      <div class="skill-card soon c-sq">
-        <div class="sk-top">
-          <div class="sk-icon">n²</div>
-          <div>
-            <div class="sk-name">Square (^2)</div>
-            <div class="sk-desc">Not built yet</div>
-          </div>
-        </div>
-        <div class="sk-progress-track"><div class="sk-progress-fill" style="width:0%"></div></div>
-        <div class="sk-nums">
-          <div class="sk-stat"><div class="num">—</div><div class="lbl">Avg</div></div>
-          <div class="sk-stat"><div class="num">—</div><div class="lbl">Accuracy</div></div>
-        </div>
-      </div>
-      <div class="skill-card soon c-cube">
-        <div class="sk-top">
-          <div class="sk-icon">n³</div>
-          <div>
-            <div class="sk-name">Cube (^3)</div>
-            <div class="sk-desc">Not built yet</div>
-          </div>
-        </div>
-        <div class="sk-progress-track"><div class="sk-progress-fill" style="width:0%"></div></div>
-        <div class="sk-nums">
-          <div class="sk-stat"><div class="num">—</div><div class="lbl">Avg</div></div>
-          <div class="sk-stat"><div class="num">—</div><div class="lbl">Accuracy</div></div>
-        </div>
-      </div>
+    <div class="section-label">Powers</div>
+    <div class="skill-grid" id="skillGridPowers">
+      <!-- cards rendered by js/ui.js -->
+    </div>
+
+    <div class="section-label">Tables &amp; Reciprocals</div>
+    <div class="skill-grid" id="skillGridRecall">
+      <!-- cards rendered by js/ui.js -->
     </div>
 
     <!-- challenge box: sits just above the Mixed drill strip -->
@@ -396,6 +372,42 @@
       <span class="cc-st-body">
         <div class="cc-st-name">Additions</div>
         <div class="cc-st-desc">Add several numbers</div>
+      </span>
+    </button>
+    <button class="cc-skill-toggle" data-skill="sq">
+      <span class="cc-st-icon">x²
+        <span class="cc-st-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+      </span>
+      <span class="cc-st-body">
+        <div class="cc-st-name">Square</div>
+        <div class="cc-st-desc">Square the number</div>
+      </span>
+    </button>
+    <button class="cc-skill-toggle" data-skill="cube">
+      <span class="cc-st-icon">x³
+        <span class="cc-st-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+      </span>
+      <span class="cc-st-body">
+        <div class="cc-st-name">Cube</div>
+        <div class="cc-st-desc">Cube the number</div>
+      </span>
+    </button>
+    <button class="cc-skill-toggle" data-skill="table">
+      <span class="cc-st-icon">6×7
+        <span class="cc-st-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+      </span>
+      <span class="cc-st-body">
+        <div class="cc-st-name">Tables</div>
+        <div class="cc-st-desc">Recall multiplication tables</div>
+      </span>
+    </button>
+    <button class="cc-skill-toggle" data-skill="recip">
+      <span class="cc-st-icon">1/n
+        <span class="cc-st-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+      </span>
+      <span class="cc-st-body">
+        <div class="cc-st-name">Reciprocals</div>
+        <div class="cc-st-desc">1/n as a percentage</div>
       </span>
     </button>
   </div>
@@ -787,8 +799,23 @@
   <div class="modal-box">
     <p>Leave this round? Your progress on it won't be saved.</p>
     <div class="modal-actions">
-      <button class="btn-ghost" id="btnCancelExit">Stay</button>
+      <button class="btn-ghost" id="btnCancelExit" data-default>Stay</button>
       <button class="btn-primary" id="btnConfirmExit">Leave</button>
+    </div>
+  </div>
+</div>
+
+<!-- one-time hint: decimal answers -->
+<div class="modal-overlay" id="decimalHintModal">
+  <div class="modal-box" role="dialog" aria-labelledby="dhTitle">
+    <div class="dh-title" id="dhTitle">No need to type the decimal point</div>
+    <p class="dh-text">Some answers have decimals. Type the whole-number part and the point is added for you, then type the rest.</p>
+    <div class="dh-example">
+      <span class="dh-eq"><span id="dhQ"></span> = <b id="dhA"></b></span>
+      Type <b id="dhWhole"></b>, the point appears, then type <b id="dhRest"></b>.
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="btnDecimalHintOk">Got it</button>
     </div>
   </div>
 </div>
@@ -836,6 +863,7 @@
 <script src="js/info.js"></script>
 <script src="js/popups.js"></script>
 <script src="js/nav.js"></script>
+<script src="js/keys.js"></script>
 
 <script>
   // Register service worker for offline support + installability.

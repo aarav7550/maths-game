@@ -1,3 +1,13 @@
+/* Self-hosted fonts (files in /fonts) so the app looks the same offline. Latin only. */
+@font-face{
+  font-family:'Inter'; font-style:normal; font-weight:100 900; font-display:swap;
+  src:url('fonts/inter-latin-wght-normal.woff2') format('woff2');
+}
+@font-face{
+  font-family:'Sora'; font-style:normal; font-weight:100 800; font-display:swap;
+  src:url('fonts/sora-latin-wght-normal.woff2') format('woff2');
+}
+
   :root{
     --bg:#F7FBFD;
     --card:#FFFFFF;
@@ -20,7 +30,8 @@
     --sk-add:  #A6459B;   --sk-add-soft:  #F8E9F6;
     --sk-sq:   #C6473A;   --sk-sq-soft:   #FBE9E7;
     --sk-cube: #2E8FA6;   --sk-cube-soft: #E4F4F8;
-    --sk-tbl:  #6C63C6;   --sk-tbl-soft:  #ECEAFA;
+    --sk-table:#6C63C6;   --sk-table-soft:#ECEAFA;
+    --sk-recip:#7E9A22;   --sk-recip-soft:#F0F5DC;
 
     --primary:#007EA7;
     --good:#1F9D6C;
@@ -196,7 +207,8 @@
   .c-add{ --accent-c:var(--sk-add); }   .c-add .sk-icon{background:var(--sk-add-soft); color:var(--sk-add);}   .c-add .sk-progress-fill{background:var(--sk-add);}
   .c-sq{ --accent-c:var(--sk-sq); }     .c-sq .sk-icon{background:var(--sk-sq-soft); color:var(--sk-sq);}     .c-sq .sk-progress-fill{background:var(--sk-sq);}
   .c-cube{ --accent-c:var(--sk-cube); } .c-cube .sk-icon{background:var(--sk-cube-soft); color:var(--sk-cube);} .c-cube .sk-progress-fill{background:var(--sk-cube);}
-  .c-tbl{ --accent-c:var(--sk-tbl); }   .c-tbl .sk-icon{background:var(--sk-tbl-soft); color:var(--sk-tbl);}   .c-tbl .sk-progress-fill{background:var(--sk-tbl);}
+  .c-table{ --accent-c:var(--sk-table); } .c-table .sk-icon{background:var(--sk-table-soft); color:var(--sk-table);} .c-table .sk-progress-fill{background:var(--sk-table);}
+  .c-recip{ --accent-c:var(--sk-recip); } .c-recip .sk-icon{background:var(--sk-recip-soft); color:var(--sk-recip);} .c-recip .sk-progress-fill{background:var(--sk-recip);}
 
   .skill-card.soon{ border-style:dashed; cursor:default; }
   .skill-card.soon:hover{ box-shadow:none; transform:none; }
@@ -1080,6 +1092,20 @@
   .modal-box .btn-ghost:hover{ background:var(--line-soft); }
   .modal-box .btn-primary{ background:var(--primary); border:none; color:#fff; font-weight:700; }
 
+  /* keyboard focus ring inside popups (only shows when using the keyboard) */
+  .modal-box button:focus-visible, .soon-btn:focus-visible, .soon-modal .dm-close:focus-visible{
+    outline:2px solid var(--primary); outline-offset:2px;
+  }
+
+  /* one-time decimal-answers hint popup */
+  .dh-title{ font-size:15.5px; font-weight:700; color:var(--ink); margin-bottom:8px; }
+  .modal-box p.dh-text{ margin-bottom:12px; }
+  .dh-example{
+    background:var(--line-soft); border-radius:10px; padding:10px 12px;
+    font-size:13.5px; line-height:1.5; color:var(--ink); margin-bottom:16px;
+  }
+  .dh-example .dh-eq{ display:block; font-weight:700; margin-bottom:2px; }
+
   .practice-toggle{
     display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim);
     cursor:pointer; user-select:none;
@@ -1235,6 +1261,10 @@
   #view-challenge .cc-skill-toggle[data-skill="x2"]{ --sc: var(--x2); }
   #view-challenge .cc-skill-toggle[data-skill="x3"]{ --sc: var(--x3); }
   #view-challenge .cc-skill-toggle[data-skill="add"]{ --sc: var(--add); }
+  #view-challenge .cc-skill-toggle[data-skill="sq"]{ --sc: var(--sk-sq); }
+  #view-challenge .cc-skill-toggle[data-skill="cube"]{ --sc: var(--sk-cube); }
+  #view-challenge .cc-skill-toggle[data-skill="table"]{ --sc: var(--sk-table); }
+  #view-challenge .cc-skill-toggle[data-skill="recip"]{ --sc: var(--sk-recip); }
   #view-challenge .cc-skill-toggle .cc-st-icon{ width:44px; height:44px; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; background: color-mix(in srgb, var(--sc) 14%, #fff); color:var(--sc); position:relative; }
   #view-challenge .cc-skill-toggle .cc-st-icon .cc-st-check-badge{ position:absolute; bottom:-4px; right:-4px; width:18px; height:18px; border-radius:50%; background:var(--sc); border:2px solid var(--bg-card); display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .12s ease; }
   #view-challenge .cc-skill-toggle.on .cc-st-icon .cc-st-check-badge{ opacity:1; }
@@ -1259,6 +1289,10 @@
   #view-challenge .cc-config-card[data-skill="x2"]{ --sc: var(--x2); }
   #view-challenge .cc-config-card[data-skill="x3"]{ --sc: var(--x3); }
   #view-challenge .cc-config-card[data-skill="add"]{ --sc: var(--add); }
+  #view-challenge .cc-config-card[data-skill="sq"]{ --sc: var(--sk-sq); }
+  #view-challenge .cc-config-card[data-skill="cube"]{ --sc: var(--sk-cube); }
+  #view-challenge .cc-config-card[data-skill="table"]{ --sc: var(--sk-table); }
+  #view-challenge .cc-config-card[data-skill="recip"]{ --sc: var(--sk-recip); }
   #view-challenge .cc-config-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
   #view-challenge .cc-config-title{ font-family:'Sora', sans-serif; font-size:14.5px; font-weight:700; }
   #view-challenge .cc-config-reset{ background:none; border:none; color:var(--text-faint); font-size:11px; font-weight:600; cursor:pointer; padding:4px 6px; border-radius:6px; }
@@ -1462,6 +1496,10 @@
   #view-challengedetails .cd-chip[data-skill="x2"]{ --sc:var(--x2); }
   #view-challengedetails .cd-chip[data-skill="x3"]{ --sc:var(--x3); }
   #view-challengedetails .cd-chip[data-skill="add"]{ --sc:var(--add); }
+  #view-challengedetails .cd-chip[data-skill="sq"]{ --sc: var(--sk-sq); }
+  #view-challengedetails .cd-chip[data-skill="cube"]{ --sc: var(--sk-cube); }
+  #view-challengedetails .cd-chip[data-skill="table"]{ --sc: var(--sk-table); }
+  #view-challengedetails .cd-chip[data-skill="recip"]{ --sc: var(--sk-recip); }
   #view-challengedetails .cd-chip-icon{ width:30px; height:30px; border-radius:9px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; background:color-mix(in srgb, var(--sc) 14%, #fff); color:var(--sc); }
   #view-challengedetails .cd-chip-name{ font-family:'Sora', sans-serif; font-weight:700; font-size:13.5px; color:var(--text); }
 
@@ -1472,6 +1510,10 @@
   #view-challengedetails .cd-card[data-skill="x2"]{ --sc:var(--x2); }
   #view-challengedetails .cd-card[data-skill="x3"]{ --sc:var(--x3); }
   #view-challengedetails .cd-card[data-skill="add"]{ --sc:var(--add); }
+  #view-challengedetails .cd-card[data-skill="sq"]{ --sc: var(--sk-sq); }
+  #view-challengedetails .cd-card[data-skill="cube"]{ --sc: var(--sk-cube); }
+  #view-challengedetails .cd-card[data-skill="table"]{ --sc: var(--sk-table); }
+  #view-challengedetails .cd-card[data-skill="recip"]{ --sc: var(--sk-recip); }
   #view-challengedetails .cd-card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
   #view-challengedetails .cd-card-title{ font-family:'Sora', sans-serif; font-size:14.5px; font-weight:700; color:var(--text); }
   #view-challengedetails .cd-level-badge{ font-family:'Sora', sans-serif; font-size:10.5px; font-weight:700; color:var(--sc); background:color-mix(in srgb, var(--sc) 12%, #fff); padding:4px 10px; border-radius:999px; }
@@ -1616,3 +1658,9 @@
   body{ -webkit-user-select:none; user-select:none; }
   input, textarea{ -webkit-user-select:text; user-select:text; }
 }
+
+
+/* ---- question-count buttons that are too big for the chosen skill/range: greyed out, not clickable ---- */
+.qcount-opt:disabled, #view-challenge .cc-qcount-opt:disabled{ opacity:0.35; cursor:not-allowed; }
+.qcount-opt:disabled:hover{ color:var(--ink-dim); }
+#view-challenge .cc-qcount-opt:disabled:hover{ color:var(--text-dim); }
