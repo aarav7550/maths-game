@@ -1,12 +1,70 @@
 // ============================================================
-// INFO.JS — About us + Report a bug pages
+// INFO.JS — About us + Report a bug pages, and the Keyboard shortcuts popup
 //
-// Wires the two 3-dot menu entries to their screens, and sends the Report a bug form
-// to Web3Forms (a third-party service that emails each report to the app owner).
+// Wires the 3-dot menu entries to their screens, builds the Keyboard shortcuts page's
+// skill-letter list from the registry, shows the one-time "there are shortcuts" popup, and sends
+// the Report a bug form to Web3Forms (a third-party service that emails each report to the app owner).
 // Loaded after challengedetails.js, before popups.js / nav.js.
 // ============================================================
 (function(){
   document.getElementById('btnAboutUs').addEventListener('click', () => showView('about'));
+
+  // ---------- Keyboard shortcuts popup ----------
+  const scOverlay = document.getElementById('shortcutsModal');
+  const hintOverlay = document.getElementById('shortcutHintModal');
+
+  function openShortcuts(){
+    markShortcutHintSeen();                    // they found the shortcuts themselves, so the one-time hint has done its job
+    hintOverlay.classList.remove('show');
+    scOverlay.classList.add('show');
+  }
+  function closeShortcuts(){ scOverlay.classList.remove('show'); }
+  // keys.js uses these for Ctrl + .
+  window.openShortcuts = openShortcuts;
+  window.closeShortcuts = closeShortcuts;
+
+  document.getElementById('btnShortcuts').addEventListener('click', openShortcuts);
+  document.getElementById('btnShortcutsClose').addEventListener('click', closeShortcuts);
+  scOverlay.addEventListener('click', (e) => { if(e.target === scOverlay) closeShortcuts(); });
+
+  // "Skill letters" list: one line per letter, built from SKILL_KEY (js/registry.js) so new skills show up on their own.
+  // Skills that share a letter are listed in the order the key cycles through them.
+  (function buildShortcutLetters(){
+    const host = document.getElementById('scLetters');
+    const byKey = new Map();
+    SKILL_ORDER.forEach(k => {
+      const letter = SKILL_KEY[k];
+      if(!byKey.has(letter)) byKey.set(letter, []);
+      byKey.get(letter).push(skillDisplayLabels[k]);
+    });
+    byKey.forEach((names, letter) => {
+      const item = document.createElement('div');
+      item.className = 'sc-letter';
+      const cap = document.createElement('span');
+      cap.className = 'kbd';
+      cap.textContent = letter.toUpperCase();
+      const text = document.createElement('span');
+      text.textContent = names.join(' \u2192 ');
+      item.append(cap, text);
+      host.appendChild(item);
+    });
+  })();
+
+  // ---------- one-time popup: "there are keyboard shortcuts" ----------
+  // Desktop-style devices only (wide screen + a mouse), once per device, on Home, and never on top of another popup.
+  function closeShortcutHint(){ hintOverlay.classList.remove('show'); }
+  document.getElementById('btnShortcutHintOk').addEventListener('click', closeShortcutHint);
+  document.getElementById('btnShortcutHintSee').addEventListener('click', openShortcuts);
+  hintOverlay.addEventListener('click', (e) => { if(e.target === hintOverlay) closeShortcutHint(); });
+
+  setTimeout(() => {
+    if(shortcutHintSeen()) return;
+    if(!window.matchMedia('(min-width:641px) and (hover:hover) and (pointer:fine)').matches) return;
+    if(typeof views === 'undefined' || !views.home.classList.contains('active')) return;
+    if(document.querySelector('.modal-overlay.show, .name-overlay.show')) return;
+    markShortcutHintSeen();   // marked when SHOWN, so it appears once whatever they do next
+    hintOverlay.classList.add('show');
+  }, 1500);
 
   // ---------- Report a bug form ----------
   // The access key is meant to be public: it can only deliver mail to the address it was created for.

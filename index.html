@@ -48,6 +48,10 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
               About us
             </button>
+            <button class="menu-item" id="btnShortcuts">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01"/><path d="M10 10h.01"/><path d="M14 10h.01"/><path d="M18 10h.01"/><path d="M7 14h10"/></svg>
+              Keyboard shortcuts
+            </button>
             <button class="menu-item" id="btnReportBug">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-5 5v1H6a3 3 0 0 0-3 3v1a3 3 0 0 0 3 3h1v1a5 5 0 0 0 10 0v-1h1a3 3 0 0 0 3-3v-1a3 3 0 0 0-3-3h-1V7a5 5 0 0 0-5-5Z"/><path d="M8 15h8"/><path d="M9 9h.01"/><path d="M15 9h.01"/></svg>
               Report a bug
@@ -112,19 +116,8 @@
       </div>
     </div>
 
-    <div class="section-label">Arithmetic</div>
-    <div class="skill-grid" id="skillGrid">
-      <!-- skill cards rendered by js/ui.js from SKILL_ORDER + real session stats -->
-    </div>
-
-    <div class="section-label">Powers</div>
-    <div class="skill-grid" id="skillGridPowers">
-      <!-- cards rendered by js/ui.js -->
-    </div>
-
-    <div class="section-label">Tables &amp; Reciprocals</div>
-    <div class="skill-grid" id="skillGridRecall">
-      <!-- cards rendered by js/ui.js -->
+    <div id="skillSections">
+      <!-- sections + cards built by js/ui.js from the skill registry (js/registry.js) -->
     </div>
 
     <!-- challenge box: sits just above the Mixed drill strip -->
@@ -338,78 +331,7 @@
 
   <div class="cc-section-label">Skills to include</div>
   <div class="cc-skill-toggle-grid" id="ccSkillGrid">
-    <button class="cc-skill-toggle" data-skill="half">
-      <span class="cc-st-icon">÷2
-        <span class="cc-st-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
-      </span>
-      <span class="cc-st-body">
-        <div class="cc-st-name">Halving</div>
-        <div class="cc-st-desc">Split a number in two</div>
-      </span>
-    </button>
-    <button class="cc-skill-toggle" data-skill="x2">
-      <span class="cc-st-icon">×2
-        <span class="cc-st-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
-      </span>
-      <span class="cc-st-body">
-        <div class="cc-st-name">× 2</div>
-        <div class="cc-st-desc">Double it</div>
-      </span>
-    </button>
-    <button class="cc-skill-toggle" data-skill="x3">
-      <span class="cc-st-icon">×3
-        <span class="cc-st-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
-      </span>
-      <span class="cc-st-body">
-        <div class="cc-st-name">× 3</div>
-        <div class="cc-st-desc">Triple it</div>
-      </span>
-    </button>
-    <button class="cc-skill-toggle" data-skill="add">
-      <span class="cc-st-icon">+
-        <span class="cc-st-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
-      </span>
-      <span class="cc-st-body">
-        <div class="cc-st-name">Additions</div>
-        <div class="cc-st-desc">Add several numbers</div>
-      </span>
-    </button>
-    <button class="cc-skill-toggle" data-skill="sq">
-      <span class="cc-st-icon">x²
-        <span class="cc-st-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
-      </span>
-      <span class="cc-st-body">
-        <div class="cc-st-name">Square</div>
-        <div class="cc-st-desc">Square the number</div>
-      </span>
-    </button>
-    <button class="cc-skill-toggle" data-skill="cube">
-      <span class="cc-st-icon">x³
-        <span class="cc-st-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
-      </span>
-      <span class="cc-st-body">
-        <div class="cc-st-name">Cube</div>
-        <div class="cc-st-desc">Cube the number</div>
-      </span>
-    </button>
-    <button class="cc-skill-toggle" data-skill="table">
-      <span class="cc-st-icon">6×7
-        <span class="cc-st-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
-      </span>
-      <span class="cc-st-body">
-        <div class="cc-st-name">Tables</div>
-        <div class="cc-st-desc">Recall multiplication tables</div>
-      </span>
-    </button>
-    <button class="cc-skill-toggle" data-skill="recip">
-      <span class="cc-st-icon">1/n
-        <span class="cc-st-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
-      </span>
-      <span class="cc-st-body">
-        <div class="cc-st-name">Reciprocals</div>
-        <div class="cc-st-desc">1/n as a percentage</div>
-      </span>
-    </button>
+    <!-- tiles built by js/challenge.js from the skill registry -->
   </div>
 
   <div class="cc-section-label" id="ccConfigSectionLabel">Per-skill difficulty</div>
@@ -581,7 +503,7 @@
 
       <div class="pg-card">
         <div class="pg-card-title">App info</div>
-        <div class="ab-row"><span class="ab-label">Version</span><span class="ab-value">1.0.0</span></div>
+        <div class="ab-row"><span class="ab-label">Version</span><span class="ab-value">2.0.0</span></div>
         <div class="ab-row"><span class="ab-label">Built for</span><span class="ab-value">CAT preparation</span></div>
         <div class="ab-row"><span class="ab-label">Runs on</span><span class="ab-value">Browser <span class="ab-badge">installable as an app</span></span></div>
       </div>
@@ -589,7 +511,14 @@
       <div class="pg-card">
         <div class="pg-card-title">Changelog</div>
         <div class="ab-log">
-          <div class="ab-log-head"><span class="ab-log-ver">v1.0.0</span><span class="ab-log-date">Current</span></div>
+          <div class="ab-log-head"><span class="ab-log-ver">v2.0.0</span><span class="ab-log-date">Current</span></div>
+          <ul>
+            <li>New skills: Square, Cube, Tables and Percentage Reciprocals</li>
+            <li>Keyboard shortcuts: press a skill's first letter to open it, Shift + H for History (then a letter for that skill's history), Shift + M for the menu, 1&ndash;5 to pick a level, Enter to start, Esc to go back. See them all with Ctrl + . or under Keyboard shortcuts in the 3 dot menu</li>
+          </ul>
+        </div>
+        <div class="ab-log">
+          <div class="ab-log-head"><span class="ab-log-ver">v1.0.0</span><span class="ab-log-date">First release</span></div>
           <ul>
             <li>Halving, &times;2, &times;3, and Additions drills, plus a Mixed mode</li>
             <li>Speed and accuracy history with trend graphs</li>
@@ -597,7 +526,7 @@
         </div>
       </div>
 
-      <div class="ab-footer">More skills &mdash; Squares, Cubes, Tables, Percentage Reciprocals &mdash; are on the way.</div>
+      <div class="ab-footer">The Mixed drill &mdash; every skill in one round &mdash; is on the way.</div>
     </div>
   </div>
 
@@ -820,6 +749,109 @@
   </div>
 </div>
 
+<!-- one-time hint: keyboard shortcuts (desktop only, shown once) -->
+<div class="modal-overlay" id="shortcutHintModal">
+  <div class="modal-box" role="dialog" aria-labelledby="shTitle">
+    <div class="dh-title" id="shTitle">There are keyboard shortcuts</div>
+    <p class="dh-text">Skip the mouse: press the first letter of a skill to open it, <span class="kbd">1</span>&ndash;<span class="kbd">5</span> to pick a level, then <span class="kbd">Enter</span> to start.</p>
+    <div class="dh-example">
+      <span class="dh-eq"><span class="kbd">H</span> opens Halving &nbsp;&middot;&nbsp; <span class="kbd">Shift</span> + <span class="kbd">H</span> opens History</span>
+      Press <span class="kbd">Ctrl</span> + <span class="kbd">.</span> any time to see them all.
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="btnShortcutHintOk" data-default>Got it</button>
+      <button class="btn-primary" id="btnShortcutHintSee">See all shortcuts</button>
+    </div>
+  </div>
+</div>
+
+<!-- keyboard shortcuts: large landscape popup -->
+<div class="modal-overlay" id="shortcutsModal">
+  <div class="sc-modal" role="dialog" aria-labelledby="scTitle">
+    <div class="sc-head">
+      <div>
+        <div class="sc-title" id="scTitle">Keyboard shortcuts</div>
+        <div class="sc-head-sub">Best on a laptop or desktop. Press <span class="kbd">Ctrl</span> + <span class="kbd">.</span> any time to open or close this.</div>
+      </div>
+      <button class="sc-close" id="btnShortcutsClose" aria-label="Close" data-default>&#10005;</button>
+    </div>
+
+    <div class="sc-body">
+      <div class="sc-col">
+        <div class="sc-group">
+          <div class="sc-group-title">Home</div>
+          <div class="sc-row">
+            <div class="sc-keys"><span class="kbd">Letter</span></div>
+            <div class="sc-desc">Press a skill's first letter to open its difficulty picker. If skills share a letter, press it again to move to the next one.</div>
+          </div>
+          <div class="sc-row">
+            <div class="sc-keys"><span class="kbd">Shift</span><span class="sc-plus">+</span><span class="kbd">H</span></div>
+            <div class="sc-desc">Open your History.</div>
+          </div>
+          <div class="sc-row">
+            <div class="sc-keys"><span class="kbd">Shift</span><span class="sc-plus">+</span><span class="kbd">M</span></div>
+            <div class="sc-desc">Open the 3 dot menu.</div>
+          </div>
+        </div>
+        <div class="sc-group">
+          <div class="sc-group-title">History</div>
+          <div class="sc-row">
+            <div class="sc-keys"><span class="kbd">Letter</span></div>
+            <div class="sc-desc">Open that skill's history. Same letters and cycling as on Home. On a skill's history page they switch to another skill.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sc-col">
+        <div class="sc-group">
+          <div class="sc-group-title">Skill letters</div>
+          <div class="sc-letters" id="scLetters"><!-- built by js/info.js from the skill registry --></div>
+        </div>
+        <div class="sc-group">
+          <div class="sc-group-title">Difficulty picker</div>
+          <div class="sc-row">
+            <div class="sc-keys"><span class="kbd">Letter</span></div>
+            <div class="sc-desc">Jump straight to another skill's picker. Same cycling as on Home.</div>
+          </div>
+          <div class="sc-row">
+            <div class="sc-keys"><span class="kbd">1</span><span class="sc-dash">&ndash;</span><span class="kbd">5</span></div>
+            <div class="sc-desc">Pick a level, in the order shown (Custom is last).</div>
+          </div>
+          <div class="sc-row">
+            <div class="sc-keys"><span class="kbd">Enter</span></div>
+            <div class="sc-desc">Start the round.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sc-col">
+        <div class="sc-group">
+          <div class="sc-group-title">The 3 dot menu</div>
+          <div class="sc-row">
+            <div class="sc-keys"><span class="kbd">&uarr;</span><span class="kbd">&darr;</span></div>
+            <div class="sc-desc">Move between the options. The first one is highlighted when the menu opens with Shift + M.</div>
+          </div>
+          <div class="sc-row">
+            <div class="sc-keys"><span class="kbd">Enter</span></div>
+            <div class="sc-desc">Open the highlighted option.</div>
+          </div>
+        </div>
+        <div class="sc-group">
+          <div class="sc-group-title">Popups and screens</div>
+          <div class="sc-row">
+            <div class="sc-keys"><span class="kbd">Esc</span></div>
+            <div class="sc-desc">Close a popup or the menu, or go back one screen. During a round it opens &ldquo;Leave this round?&rdquo; (press Esc again to stay).</div>
+          </div>
+          <div class="sc-row">
+            <div class="sc-keys"><span class="kbd">&larr;</span><span class="kbd">&rarr;</span><span class="kbd">&uarr;</span><span class="kbd">&darr;</span></div>
+            <div class="sc-desc">Move between a popup's buttons. Enter presses the highlighted one.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- challenge code: show generated code -->
 <div class="modal-overlay" id="challengeShowModal">
   <div class="modal-box">
@@ -850,6 +882,7 @@
 
 <input type="file" id="importFileInput" accept=".json" style="display:none;">
 
+<script src="js/registry.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/skills.js"></script>
 <script src="js/game.js"></script>

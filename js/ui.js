@@ -5,63 +5,11 @@
 // ---------- difficulty presets ----------
 // Each preset fills range (+ count for additions); parity is left alone.
 // decimalPct (additions only) = % of questions that contain decimal numbers. Missing = never.
-const DIFFICULTY_PRESETS = {
-  half: {
-    veryeasy: { min: 1, max: 99, secs: 8 },
-    easy: { min: 100, max: 299, secs: 10 },
-    difficult: { min: 300, max: 999, secs: 13 },
-    verydifficult: { min: 1000, max: 9999, secs: 20 }
-  },
-  x2: {
-    veryeasy: { min: 1, max: 100, secs: 8 },
-    easy: { min: 100, max: 500, secs: 13 },
-    difficult: { min: 500, max: 1000, secs: 15 },
-    verydifficult: { min: 1000, max: 10000, secs: 17 }
-  },
-  x3: {
-    veryeasy: { min: 1, max: 30, secs: 10 },
-    easy: { min: 30, max: 100, secs: 15 },
-    difficult: { min: 100, max: 300, secs: 21 },
-    verydifficult: { min: 300, max: 500, secs: 25 }
-  },
-  add: {
-    veryeasy: { min: 1, max: 99, count: 2, secs: 9 },
-    easy: { min: 1, max: 999, count: 2, secs: 15, decimalPct: 20 },
-    difficult: { min: 1, max: 999, count: 3, secs: 25, decimalPct: 30 },
-    verydifficult: { min: 1, max: 9999, count: 4, secs: 30, decimalPct: 40 }
-  },
-  // Square / Cube have no Very Difficult yet - a skill only shows the levels listed here.
-  sq: {
-    veryeasy: { min: 1, max: 15, secs: 5 },
-    easy: { min: 16, max: 30, secs: 8 },
-    difficult: { min: 31, max: 100, secs: 20 }
-  },
-  cube: {
-    veryeasy: { min: 1, max: 15, secs: 8 },
-    easy: { min: 16, max: 30, secs: 10 },
-    difficult: { min: 31, max: 100, secs: 30 }
-  },
-  // Tables: asks x × n, x from the range, n from 2-9.
-  table: {
-    veryeasy: { min: 1, max: 10, secs: 8 },
-    easy: { min: 11, max: 20, secs: 10 },
-    difficult: { min: 21, max: 30, secs: 15 },
-    verydifficult: { min: 31, max: 40, secs: 18 }
-  },
-  // Reciprocals: difficulty = direction, not range, so both levels share 1-30 and differ by `mode`.
-  // `label` / `note` override the auto-built range text on the picker pills.
-  recip: {
-    easy: { min: 1, max: 30, mode: 'fwd', secs: 10, label: 'Fraction → %', note: 'Numbers from <b>1–30</b>. You get <b>1/7</b>, type the percentage (14.28).' },
-    difficult: { min: 1, max: 30, mode: 'rev', secs: 13, label: '% → Fraction', note: 'Numbers from <b>1–30</b>. You get <b>14.28%</b>, type the number under the 1 (7).' }
-  }
-};
-// Order the levels appear in the picker. A skill only shows the ones it has presets for.
-const DIFF_ORDER = ['veryeasy','easy','difficult','verydifficult'];
-// Skills with no Custom option (Reciprocals has no range worth customising).
-const NO_CUSTOM = { recip: true };
+// DIFFICULTY_PRESETS, DIFF_ORDER, NO_CUSTOM, CUSTOM_NOTE and the skill names/icons/colours
+// all come from SKILL_META in js/registry.js - add or change skills there.
+
 // Custom ranges have no preset of their own, so they borrow the Difficult level's timer.
 const CUSTOM_TIMER_LEVEL = 'difficult';
-const skillDisplayLabels = { half:'Halving', x2:'× 2', x3:'× 3', add:'Additions', sq:'Square', cube:'Cube', table:'Tables', recip:'Reciprocals' };
 
 // ---------- more-options menu (About us / Report a bug) ----------
 const btnMoreMenu = document.getElementById('btnMoreMenu');
@@ -166,17 +114,6 @@ nameInput.addEventListener('keydown', (e) => {
 // TrendChart.mount() against it.
 
 // ---------- dashboard rendering (real data — sessions + skillConfig) ----------
-const SKILL_ICON = { half:'÷2', x2:'×2', x3:'×3', add:'+', sq:'x²', cube:'x³', table:'6×7', recip:'1/n' };
-const SKILL_CLASS = { half:'c-half', x2:'c-x2', x3:'c-x3', add:'c-add', sq:'c-sq', cube:'c-cube', table:'c-table', recip:'c-recip' };
-const SKILL_DESC = { half:'Split a number in two', x2:'Double it', x3:'Triple it', add:'Add several numbers together',
-  sq:'Square the number', cube:'Cube the number', table:'Recall multiplication tables', recip:'1/n as a percentage' };
-const SKILL_COLOR = { half:'#3B6FE0', x2:'#1F9D6C', x3:'#DB8B1E', add:'#A6459B', sq:'#C6473A', cube:'#2E8FA6', table:'#6C63C6', recip:'#7E9A22' };   // keep in sync with --sk-* in style.css
-// Which home-screen grid (element id in index.html) each skill's card goes into.
-const SKILL_GROUPS = {
-  skillGrid: ['half','x2','x3','add'],
-  skillGridPowers: ['sq','cube'],
-  skillGridRecall: ['table','recip']
-};
 
 function renderDashboardStats(){
   const streak = computeHomeStreak();
@@ -240,12 +177,22 @@ function renderDashboardStats(){
   }
 }
 
+// Builds every Home section (label + card grid) from the registry's groups.
 function renderSkillCards(){
-  Object.keys(SKILL_GROUPS).forEach(id => renderSkillGrid(id, SKILL_GROUPS[id]));
+  const host = document.getElementById('skillSections');
+  host.innerHTML = '';
+  SKILL_GROUPS.forEach(g => {
+    const label = document.createElement('div');
+    label.className = 'section-label';
+    label.textContent = g.label;
+    const grid = document.createElement('div');
+    grid.className = 'skill-grid';
+    host.appendChild(label);
+    host.appendChild(grid);
+    renderSkillGrid(grid, g.skills);
+  });
 }
-function renderSkillGrid(gridId, keys){
-  const grid = document.getElementById(gridId);
-  grid.innerHTML = '';
+function renderSkillGrid(grid, keys){
   keys.forEach(key => {
     const skillSessions = sessions.filter(s => s.skill === key);
     const hasData = skillSessions.length > 0;
@@ -257,7 +204,6 @@ function renderSkillGrid(gridId, keys){
     const card = document.createElement('button');
     card.className = 'skill-card ' + SKILL_CLASS[key];
     card.dataset.skill = key;
-    card.style.setProperty('--sc', SKILL_COLOR[key]);
     card.innerHTML = `
       <div class="sk-top">
         <div class="sk-icon">${SKILL_ICON[key]}</div>
@@ -299,12 +245,10 @@ function renderHomeDashboard(){
 }
 renderHomeDashboard();
 
-Object.keys(SKILL_GROUPS).forEach(id => {
-  document.getElementById(id).addEventListener('click', (e) => {
-    const card = e.target.closest('.skill-card');
-    if(!card || card.classList.contains('soon')) return;
-    openDifficultyPicker(card.dataset.skill);
-  });
+document.getElementById('skillSections').addEventListener('click', (e) => {
+  const card = e.target.closest('.skill-card');
+  if(!card || card.classList.contains('soon')) return;
+  openDifficultyPicker(card.dataset.skill);
 });
 
 document.getElementById('historyCard').addEventListener('click', () => {
@@ -324,15 +268,6 @@ mixedSoonModal.addEventListener('click', (e) => { if(e.target === mixedSoonModal
 
 // ---------- Difficulty Picker ----------
 const DIFF_LABELS = { veryeasy:'Very Easy', easy:'Easy', difficult:'Difficult', verydifficult:'Very Difficult', custom:'Custom' };
-const CUSTOM_NOTE = {
-  half: 'Pick your own min/max and number type before you start.',
-  x2: 'Pick your own min/max before you start.',
-  x3: 'Pick your own min/max before you start.',
-  add: 'Pick your own min/max and how many numbers to add.',
-  sq: 'Pick your own min/max and number type before you start.',
-  cube: 'Pick your own min/max and number type before you start.',
-  table: 'Pick the range for the first number (it is multiplied by 2–9).'
-};
 const LEVEL_READY_MESSAGE = {
   veryeasy: 'Easing in, nice and steady.',
   easy: "You've got this.",
@@ -476,18 +411,14 @@ function isSelectionReady(){
   return true;
 }
 
-// How many questions a skill + range can give without repeating a number. Greyed-out question
-// counts above this keep the no-repeat promise (and the 1–30 reciprocals from running dry).
-function questionPoolSize(key, cfg){
-  const lo = Math.min(cfg.min, cfg.max), hi = Math.max(cfg.min, cfg.max);
-  const parity = cfg.parity || 'any';
-  if(key === 'add') return Infinity;
-  if(key === 'recip') return Math.max(0, Math.min(30, hi) - Math.max(1, lo) + 1);
-  if(key === 'table') return countPoolSize(lo, hi, parity) * 8;   // x from the range, n from 2-9
-  return countPoolSize(lo, hi, parity);
-}
 function pickerMaxQuestions(){
-  if(!pickerLevel) return Infinity;
+  if(!pickerLevel){
+    // No level picked yet: a count is only blocked if it is too big for EVERY level the skill offers
+    // (e.g. Reciprocals can never reach 50). Skills with Custom stay open, since Custom has no cap.
+    if(!NO_CUSTOM[CURRENT_SKILL]) return Infinity;
+    return Math.max(...Object.values(DIFFICULTY_PRESETS[CURRENT_SKILL]).map(p =>
+      questionPoolSize(CURRENT_SKILL, { min: p.min, max: p.max, parity: 'any' })));
+  }
   let cfg;
   if(pickerLevel === 'custom') cfg = pickerCustom;
   else {
@@ -552,6 +483,7 @@ function openDifficultyPicker(skillKey){
   [...qcountBar.querySelectorAll('.qcount-opt')].forEach(o => o.classList.remove('active','expanded'));
   qcountBar.classList.remove('custom-active');
   qcountBar.querySelector('[data-n="15"]').classList.add('active');
+  applyQcountLimits();
 
   // The skill card you clicked still has keyboard focus under the popup; let go of it so
   // Enter means "start" and not "click that card again".

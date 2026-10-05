@@ -50,9 +50,9 @@
 
     let rows = `
       <div class="cd-row"><span class="cd-label">Range</span><span class="cd-value">${cfg.min}–${cfg.max}</span></div>`;
-    if(skillId === 'recip'){
+    if(SKILL_META[skillId].modeText){
       rows += `
-      <div class="cd-row"><span class="cd-label">Direction</span><span class="cd-value">${cfg.mode === 'rev' ? '% → Fraction' : 'Fraction → %'}</span></div>`;
+      <div class="cd-row"><span class="cd-label">${SKILL_META[skillId].modeLabel || 'Mode'}</span><span class="cd-value">${SKILL_META[skillId].modeText(cfg)}</span></div>`;
     } else if(!isAdd){
       rows += `
       <div class="cd-row"><span class="cd-label">Number type</span><span class="cd-value">${PARITY_LABEL[cfg.parity] || PARITY_LABEL.any}</span></div>`;

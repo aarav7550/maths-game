@@ -1,11 +1,12 @@
 // Bump this version string whenever you deploy changes so old caches get replaced.
-const CACHE_VERSION = 'numbers-v32';
+const CACHE_VERSION = 'numbers-v36';
 const CACHE_NAME = `numbers-cache-${CACHE_VERSION}`;
 
 const ASSETS = [
   './',
   './index.html',
   './style.css',
+  './js/registry.js',
   './js/storage.js',
   './js/skills.js',
   './js/popups.js',

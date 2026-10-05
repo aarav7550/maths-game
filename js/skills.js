@@ -30,7 +30,6 @@ const RECIPROCALS = {
 // ---------- skill generators ----------
 const SKILLS = {
   half: {
-    label: 'Halving',
     hasDecimals: true,   // odd numbers give answers like 241.5 (drives the one-time hint popup)
     gen(){
       const cfg = activeConfig('half');
@@ -41,7 +40,6 @@ const SKILLS = {
     }
   },
   x2: {
-    label: '× 2',
     gen(){
       const cfg = activeConfig('x2');
       let min = Math.min(cfg.min, cfg.max), max = Math.max(cfg.min, cfg.max);
@@ -50,7 +48,6 @@ const SKILLS = {
     }
   },
   x3: {
-    label: '× 3',
     gen(){
       const cfg = activeConfig('x3');
       let min = Math.min(cfg.min, cfg.max), max = Math.max(cfg.min, cfg.max);
@@ -59,7 +56,6 @@ const SKILLS = {
     }
   },
   add: {
-    label: 'Additions',
     hasDecimals: true,   // some questions have decimal numbers (drives the one-time hint popup)
     gen(){
       const cfg = activeConfig('add');
@@ -75,7 +71,6 @@ const SKILLS = {
     }
   },
   sq: {
-    label: 'Square',
     gen(){
       const cfg = activeConfig('sq');
       let min = Math.min(cfg.min, cfg.max), max = Math.max(cfg.min, cfg.max);
@@ -84,7 +79,6 @@ const SKILLS = {
     }
   },
   cube: {
-    label: 'Cube',
     gen(){
       const cfg = activeConfig('cube');
       let min = Math.min(cfg.min, cfg.max), max = Math.max(cfg.min, cfg.max);
@@ -93,7 +87,6 @@ const SKILLS = {
     }
   },
   table: {
-    label: 'Tables',
     gen(){
       // x comes from the configured range, n is always 2-9. No repeated x×n pair within a round.
       const cfg = activeConfig('table');
@@ -113,7 +106,6 @@ const SKILLS = {
     }
   },
   recip: {
-    label: 'Reciprocals',
     hasDecimals: true,   // forward mode has answers like 14.28 (drives the one-time hint popup)
     gen(){
       const cfg = activeConfig('recip');
@@ -127,7 +119,11 @@ const SKILLS = {
     }
   }
 };
-const SKILL_ORDER = ['half','x2','x3','add','sq','cube','table','recip'];
+// Every skill in SKILL_META (js/registry.js) needs a generator here, under the same key.
+SKILL_ORDER.forEach(k => {
+  if(!SKILLS[k]){ console.warn('Skill "' + k + '" is in js/registry.js but has no generator in SKILLS'); return; }
+  SKILLS[k].label = SKILL_META[k].label;
+});
 
 
 // ---------- state ----------

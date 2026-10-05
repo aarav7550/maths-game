@@ -45,11 +45,9 @@ function endRoundAbruptly(){
 // Shown the first time each applicable skill (Halving, Additions) is played, then never again
 // on that device. Add `hasDecimals: true` to a skill in skills.js to include it.
 const DECIMAL_HINT_KEY = 'numbers_decimalHintSeen';
-const DECIMAL_HINT_EXAMPLES = {
-  half: { q: 'Half of 483', a: '241.5', whole: '241', rest: '5' },
-  add:  { q: '12.5 + 3.7',  a: '16.2',  whole: '16',  rest: '2' },
-  recip:{ q: '1/8 in %',    a: '12.5',  whole: '12',  rest: '5' }
-};
+// Example for the one-time decimal hint comes from each skill's `hint` in js/registry.js
+const DECIMAL_HINT_EXAMPLES = {};
+SKILL_ORDER.forEach(k => { if(SKILL_META[k].hint) DECIMAL_HINT_EXAMPLES[k] = SKILL_META[k].hint; });
 const decimalHintModal = document.getElementById('decimalHintModal');
 const hintShownThisSession = {};   // backup in case localStorage is blocked
 
@@ -410,8 +408,8 @@ function describeSkillConfig(key, cfg){
   if(key === 'add'){
     return `${skillDisplayLabels[key]}: ${diff} (${cfg.min}–${cfg.max}, ${cfg.count || 2} numbers, ${cfg.parity})`;
   }
-  if(key === 'recip'){
-    return `${skillDisplayLabels[key]}: ${diff} (${cfg.mode === 'rev' ? '% → fraction' : 'fraction → %'})`;
+  if(SKILL_META[key].modeText){
+    return `${skillDisplayLabels[key]}: ${diff} (${SKILL_META[key].modeText(cfg)})`;
   }
   return `${skillDisplayLabels[key]}: ${diff} (${cfg.min}–${cfg.max}, ${cfg.parity})`;
 }

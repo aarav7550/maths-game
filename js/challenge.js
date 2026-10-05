@@ -18,6 +18,17 @@
   const SKILL_ORDER_LOCAL = SKILL_ORDER.slice();
 
   const grid = document.getElementById('ccSkillGrid');
+  // Skill tiles are built from the registry, so a new skill shows up here automatically.
+  grid.innerHTML = SKILL_ORDER.map(k => `
+    <button class="cc-skill-toggle" data-skill="${k}">
+      <span class="cc-st-icon">${SKILL_ICON[k]}
+        <span class="cc-st-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+      </span>
+      <span class="cc-st-body">
+        <div class="cc-st-name">${skillDisplayLabels[k]}</div>
+        <div class="cc-st-desc">${SKILL_DESC[k]}</div>
+      </span>
+    </button>`).join('');
   const configStack = document.getElementById('ccConfigStack');
   const emptyNote = document.getElementById('ccEmptyNote');
   const btnGenerate = document.getElementById('ccBtnGenerate');
