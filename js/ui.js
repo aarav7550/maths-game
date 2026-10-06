@@ -198,8 +198,6 @@ function renderSkillGrid(grid, keys){
     const hasData = skillSessions.length > 0;
     const avg = hasData ? skillSessions.reduce((a,s) => a+s.avgTime, 0) / skillSessions.length : null;
     const acc = hasData ? Math.round(skillSessions.reduce((a,s) => a+s.accuracy, 0) / skillSessions.length) : null;
-    // progress bar: how close recent accuracy is to 100%, just a simple visual — not a claim of mastery
-    const progressPct = hasData ? Math.max(4, Math.min(100, acc)) : 0;
 
     const card = document.createElement('button');
     card.className = 'skill-card ' + SKILL_CLASS[key];
@@ -212,11 +210,12 @@ function renderSkillGrid(grid, keys){
           <div class="sk-desc">${SKILL_DESC[key]}</div>
         </div>
       </div>
-      <div class="sk-progress-track"><div class="sk-progress-fill" style="width:${progressPct}%"></div></div>
+      <div class="sk-bar"></div>
       <div class="sk-nums">
         <div class="sk-stat"><div class="num">${hasData ? avg.toFixed(1)+'s' : '—'}</div><div class="lbl">Avg</div></div>
         <div class="sk-stat"><div class="num">${hasData ? acc+'%' : '—'}</div><div class="lbl">Accuracy</div></div>
       </div>
+      <span class="sk-play"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z"/></svg> Play</span>
     `;
     grid.appendChild(card);
   });

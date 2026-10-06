@@ -186,12 +186,42 @@
   }
   .sk-name{ font-family:'Sora',sans-serif; font-weight:700; font-size:15px; }
   .sk-desc{ font-size:11.5px; color:var(--ink-dim); }
-  .sk-progress-track{ height:5px; border-radius:3px; background:var(--track); overflow:hidden; }
-  .sk-progress-fill{ height:100%; border-radius:3px; }
+  /* decorative coloured divider between the name/description and the stats (not tied to any data) */
+  .sk-bar{ height:5px; border-radius:3px; background:var(--accent-c, var(--sk-half)); flex-shrink:0; }
   .sk-nums{ display:flex; gap:28px; justify-content:center; }
   .sk-nums .sk-stat{ display:flex; flex-direction:column; align-items:center; text-align:center; }
   .sk-nums .num{ font-family:'Sora',sans-serif; font-weight:700; font-size:14px; }
   .sk-nums .lbl{ font-size:9px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:0.02em; }
+
+  /* Play button on each Home skill card (a span, because the card itself is a <button>) */
+  .sk-play{
+    display:flex; align-items:center; justify-content:center; gap:6px; width:100%;
+    border:none; border-radius:9px; cursor:pointer;
+    font-family:'Sora',sans-serif; font-weight:700; letter-spacing:0.01em;
+    background:var(--accent-c);
+    background:color-mix(in srgb, var(--accent-c) 22%, #ffffff);
+    color:var(--accent-c);
+    color:color-mix(in srgb, var(--accent-c) 72%, #000000);
+    transition:transform .08s ease, background .12s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  /* translateY = fine-tune so the arrow's tip points at the vertical centre of the capital P; bigger = lower, negative = higher */
+  .sk-play svg{ width:11px; height:11px; fill:currentColor; stroke:none; flex-shrink:0; transform:translateY(-0.3px); }
+  .skill-card:not(.soon):active .sk-play{ transform:scale(0.97); }
+
+  /* DESKTOP ONLY: narrower Home cards, Play button size, wider gap between Avg and Accuracy */
+  @media (min-width:641px){
+    .sk-play{ height:32px; font-size:12.5px; }
+    #skillSections .sk-nums{ gap:48px; }
+    #skillSections .skill-grid{ grid-template-columns:repeat(auto-fill, 250px); }
+    .skill-grid + .section-label{ margin-top:34px; }
+    .section-label.more-fun{ margin-top:34px; }
+    /* same width as a row of 3 skill cards (3 x 250px + 2 x 14px gap), centred; the header shares the box edge */
+    .challenge-box, .brave-strip, .section-label.more-fun{ max-width:778px; margin-left:auto; margin-right:auto; }
+  }
+  @media (min-width:641px) and (hover:hover){
+    .skill-card:hover .sk-play{ background:color-mix(in srgb, var(--accent-c) 36%, #ffffff); }
+  }
 
 
   .skill-card.soon{ border-style:dashed; cursor:default; }
@@ -221,6 +251,7 @@
     margin-top:28px; background:var(--card); border:1px solid var(--line); border-radius:16px;
     padding:16px 22px; display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;
   }
+  .section-label.more-fun + .challenge-box{ margin-top:0; }
   .challenge-box .cb-left{display:flex; align-items:center; gap:14px; min-width:0;}
   .challenge-box .cb-icon{
     width:46px; height:46px; border-radius:12px; flex-shrink:0;
@@ -270,12 +301,18 @@
 
     .skill-grid{ grid-template-columns:1fr 1fr; gap:9px; }
     .skill-card{ padding:14px 9px; gap:11px; }
-    .sk-icon{ width:46px; height:46px; font-size:15px; border-radius:12px; }
+    .sk-icon{ width:42px; height:42px; font-size:14px; border-radius:11px; }
+    #skillSections .sk-top{ gap:8px; }
     .sk-name{ font-size:15px; }
     .sk-desc{ font-size:12px; }
-    .sk-progress-track{ height:6px; }
     .sk-nums .num{ font-size:15px; }
     .sk-nums .lbl{ font-size:9.5px; }
+    .sk-play{ height:30px; font-size:12px; }
+    #skillSections .sk-nums{ gap:36px; }
+    .sk-bar{ height:3px; }
+    .skill-grid + .section-label{ margin-top:32px; }
+    .section-label.more-fun{ margin-top:32px; }
+    #skillSections .sk-bar{ margin-top:auto; }
 
     .section-label{ font-size:13.5px; }
 
