@@ -1,6 +1,8 @@
 // ============================================================
 // CHALLENGE.JS — the Create Challenge screen (pick skills + difficulty + question
-// count, then generate a shareable code).
+// count, then generate a shareable code OR start playing it straight away).
+// The same screen also serves as the Mixed drill setup: openChallengeScreen('mixed') (Home's
+// "Feeling brave?" strip) switches its texts and turns the bottom button into a plain Start.
 //
 // Uses from other files (all loaded before this one):
 //   ui.js       DIFFICULTY_PRESETS, presetLabel(), presetNote(), CUSTOM_NOTE, DIFF_LABELS, showGeneratedCode()
@@ -32,6 +34,11 @@
   const configStack = document.getElementById('ccConfigStack');
   const emptyNote = document.getElementById('ccEmptyNote');
   const btnGenerate = document.getElementById('ccBtnGenerate');
+  const btnStart = document.getElementById('ccBtnStart');
+  const topbarTitle = document.getElementById('ccTopbarTitle');
+  const pageSub = document.getElementById('ccPageSub');
+  const slTag = document.getElementById('ccSlTag');
+  const qcountLabel = document.getElementById('ccQcountLabel');
   const blockedMsg = document.getElementById('ccBlockedMsg');
   const summaryTitle = document.getElementById('ccSummaryTitle');
   const summaryDesc = document.getElementById('ccSummaryDesc');
@@ -45,8 +52,35 @@
   let selected = new Set();
   let config = {};
   let questionCount = 15;
+  let mode = 'challenge';       // 'challenge' = Create a challenge (code + Start)   'mixed' = Mixed drill (Start only)
+  let draftSeed = randomSeed(); // one seed per opening of the screen, so a code you generate and the round you Start are the SAME questions
+
+  // Every text that differs between the two modes lives here.
+  const MODE_TEXT = {
+    challenge: {
+      title: 'Create a challenge',
+      sub: 'Pick the skills to include, set a difficulty for each, and share the code — whoever plays it gets your exact set of questions.',
+      tag: 'Your challenge', qlabel: 'Questions in this challenge',
+      none: 'Include at least one skill to generate a challenge.', build: 'Turn on a skill above to build your challenge'
+    },
+    mixed: {
+      title: 'Mixed drill',
+      sub: 'Pick the skills to shuffle together and set a difficulty for each. The round starts as soon as you press Start.',
+      tag: 'Your drill', qlabel: 'Questions in this drill',
+      none: 'Include at least one skill to start the drill.', build: 'Turn on a skill above to build your drill'
+    }
+  };
+  function applyModeTexts(){
+    const t = MODE_TEXT[mode];
+    view.dataset.mode = mode;   // CSS hides the "Generate code" half of the button in mixed mode
+    topbarTitle.textContent = t.title;
+    pageSub.textContent = t.sub;
+    slTag.textContent = t.tag;
+    qcountLabel.textContent = t.qlabel;
+  }
 
   function freshDraft(){
+    draftSeed = randomSeed();
     selected = new Set();   // start from scratch: the player picks every skill themselves
     config = {};
     SKILL_ORDER_LOCAL.forEach(k => {
@@ -377,12 +411,13 @@
     const n = selected.size;
     const invalid = n > 0 && customIsInvalid();
     btnGenerate.disabled = (n === 0) || invalid;
+    btnStart.disabled = btnGenerate.disabled;
 
     if(n === 0){
-      blockedMsg.textContent = 'Include at least one skill to generate a challenge.';
+      blockedMsg.textContent = MODE_TEXT[mode].none;
       blockedMsg.classList.add('show');
       summaryTitle.textContent = 'No skills selected yet';
-      summaryDesc.textContent = 'Turn on a skill above to build your challenge';
+      summaryDesc.textContent = MODE_TEXT[mode].build;
       summaryEst.textContent = '—';
       return;
     }
@@ -425,8 +460,30 @@
     if(included.length === 0) return;
     const cfgBySkill = {};
     included.forEach(k => { cfgBySkill[k] = resolveConfig(k); });
-    const payload = buildChallengePayload(included, cfgBySkill, questionCount, randomSeed());
+    const payload = buildChallengePayload(included, cfgBySkill, questionCount, draftSeed);
     showGeneratedCode(encodeChallengeCode(payload));   // existing "share this code" popup in ui.js
+  });
+
+  // Start: play this set right now (no trip through Enter code + Challenge details).
+  // - Create a challenge: uses the same seed as the code above, so you play exactly what you share. Saved as a challenge round.
+  // - Mixed drill: a fresh seed every time; saved to History as a normal Mixed round (fromChallenge:false).
+  // It goes through the same pendingChallenge hand-off an entered code uses, so game.js needs no special case.
+  btnStart.addEventListener('click', () => {
+    if(btnStart.disabled) return;
+    const included = SKILL_ORDER_LOCAL.filter(k => selected.has(k));
+    if(included.length === 0) return;
+    const cfgBySkill = {};
+    included.forEach(k => { cfgBySkill[k] = resolveConfig(k); });
+    state.practiceMode = false;   // a leftover Practice tick from an earlier round must not stop this one being saved
+    pendingChallenge = {
+      included,
+      cfg: cfgBySkill,
+      n: questionCount,
+      seed: mode === 'mixed' ? randomSeed() : draftSeed,
+      fromChallenge: mode === 'challenge',
+      returnTo: 'challenge'   // leaving the round returns to THIS screen, settings intact (see game.js)
+    };
+    startRound();
   });
 
   // ---------- keep a focused field clear of the phone keyboard ----------
@@ -471,7 +528,9 @@
   });
 
   // ---------- entry point: Home → "Create" ----------
-  function openChallengeScreen(){
+  function openChallengeScreen(m){
+    mode = (m === 'mixed') ? 'mixed' : 'challenge';
+    applyModeTexts();
     freshDraft();
     grid.querySelectorAll('.cc-skill-toggle').forEach(t => t.classList.toggle('on', selected.has(t.dataset.skill)));
     qcountBar.querySelectorAll('.cc-qcount-opt').forEach(o => o.classList.remove('active', 'expanded'));
@@ -486,5 +545,10 @@
   window.openChallengeScreen = openChallengeScreen;
 
   const homeCreateBtn = document.getElementById('challengeCreateBtn');
-  if(homeCreateBtn) homeCreateBtn.addEventListener('click', openChallengeScreen);
+  if(homeCreateBtn) homeCreateBtn.addEventListener('click', () => openChallengeScreen('challenge'));
+
+  // Home's "Feeling brave?" strip opens the same screen as the Mixed drill setup. The WHOLE strip is the tap target
+  // (the Start button inside it is part of the strip, so its click bubbles up to this one handler).
+  const homeMixedStrip = document.getElementById('braveStrip');
+  if(homeMixedStrip) homeMixedStrip.addEventListener('click', () => openChallengeScreen('mixed'));
 })();

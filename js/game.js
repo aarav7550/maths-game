@@ -18,7 +18,10 @@ btnCancelExit.addEventListener('click', () => {
 btnConfirmExit.addEventListener('click', () => {
   exitModal.classList.remove('show');
   endRoundAbruptly();
-  showView('home');
+  // Rounds started from the Create / Mixed screen go back to it (one step back in history, so the screen is
+  // exactly as it was left: skills, levels, question count). Everything else still goes Home.
+  if(state.returnTo === 'challenge') history.back();
+  else showView('home');
 });
 
 function pauseRoundForModal(){
@@ -108,13 +111,15 @@ function startRound(){
     activeChallengeCfg = ch.cfg;
     activeChallengeIncluded = ch.included;
     state.seed = ch.seed;
-    state.fromChallenge = true;
+    state.fromChallenge = ch.fromChallenge !== false;   // Mixed drill passes false; entered codes leave it unset (= true)
+    state.returnTo = ch.returnTo || 'home';             // where "Leave round" goes; only Create/Mixed set it
     pendingChallenge = null;
   } else {
     activeChallengeCfg = null;
     activeChallengeIncluded = null;
     state.seed = randomSeed();
     state.fromChallenge = false;
+    state.returnTo = 'home';
   }
   rng = mulberry32(state.seed);
 

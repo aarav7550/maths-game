@@ -255,15 +255,7 @@ document.getElementById('historyCard').addEventListener('click', () => {
   showView('history');
 });
 
-// Mixed drill strip: shows a "coming soon" popup for now — Mixed needs an Include tab +
-// per-skill config the Difficulty Picker doesn't have yet. (Challenge codes that contain
-// several skills still start a mixed round; only this Home entry point is blocked.)
-const mixedSoonModal = document.getElementById('mixedSoonModal');
-function closeMixedSoon(){ mixedSoonModal.classList.remove('show'); }
-document.getElementById('btnMixedStart').addEventListener('click', () => mixedSoonModal.classList.add('show'));
-document.getElementById('btnSoonClose').addEventListener('click', closeMixedSoon);
-document.getElementById('btnSoonOk').addEventListener('click', closeMixedSoon);
-mixedSoonModal.addEventListener('click', (e) => { if(e.target === mixedSoonModal) closeMixedSoon(); });
+// Mixed drill strip: its Start button opens the Create screen in Mixed drill mode (wired in js/challenge.js).
 
 // ---------- Difficulty Picker ----------
 const DIFF_LABELS = { veryeasy:'Very Easy', easy:'Easy', difficult:'Difficult', verydifficult:'Very Difficult', custom:'Custom' };
@@ -748,13 +740,15 @@ document.getElementById('btnResultsBack').addEventListener('click', () => showVi
 // Go again: replay the same skill/config/question count with fresh questions.
 // state.skill / totalQuestions / practiceMode still hold the round just finished.
 document.getElementById('btnAgain').addEventListener('click', () => {
-  if(state.fromChallenge && activeChallengeIncluded){
-    // Challenge round: re-run its skills + settings, but with a new random seed
+  if(activeChallengeIncluded){
+    // Challenge or Mixed drill round: re-run its skills + settings, but with a new random seed
     pendingChallenge = {
       included: activeChallengeIncluded,
       cfg: activeChallengeCfg,
       n: state.totalQuestions,
-      seed: randomSeed()
+      seed: randomSeed(),
+      fromChallenge: state.fromChallenge,  // a Mixed drill stays a normal (non-challenge) round
+      returnTo: state.returnTo             // and Leave-round still returns to the Create / Mixed screen
     };
   }
   startRound();

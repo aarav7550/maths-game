@@ -1375,7 +1375,7 @@
     #view-challenge .cc-summary-est .lbl{ font-size:9.5px; color:var(--feature-accent-dim); text-transform:uppercase; margin-top:2px; }
   }
   @media (max-width: 640px){
-    #view-challenge .cc-summary-strip{ padding:14px 14px 14px 12px; left:14px; right:14px; bottom:12px; }
+    #view-challenge .cc-summary-strip{ padding:19px 14px 19px 14px; left:14px; right:14px; bottom:12px; }
     #view-challenge .cc-summary-left .cc-sl-tag{ font-size:10.5px; color:var(--feature-accent-dim); font-weight:700; text-transform:uppercase; letter-spacing:0.04em; }
     #view-challenge .cc-summary-left .cc-sl-title{ font-family:'Sora', sans-serif; font-weight:700; font-size:14.5px; margin-top:3px; }
     #view-challenge .cc-summary-left .cc-sl-desc{ font-size:12px; color:var(--feature-accent-dim); margin-top:4px; line-height:1.4; }
@@ -1389,6 +1389,31 @@
   #view-challenge .cc-btn-generate:active{ transform:scale(0.97); }
   #view-challenge .cc-btn-generate:disabled{ opacity:0.4; cursor:not-allowed; transform:none; }
   #view-challenge .cc-btn-generate svg{ width:15px; height:15px; }
+  /* ---- split Start / Generate code button (Create a challenge) ----
+     One button cut on a diagonal: left half = Generate code (blue), right half = Start (red).
+     Mixed drill mode (data-mode="mixed") hides the left half and Start becomes the whole button.
+     Swap the two colours on the next line (left = Generate code, right = Start); label colours are set on the two rules below. */
+  #view-challenge{ --cc-split-left: #E5484D; --cc-split-right: var(--feature-accent); }
+  #view-challenge .cc-btn-split{ display:flex; align-items:stretch; border-radius:10px; overflow:hidden; flex-shrink:0; }
+  #view-challenge .cc-btn-split button{ border:none; border-radius:0; cursor:pointer; font-family:'Sora', sans-serif; font-weight:700; display:flex; align-items:center; justify-content:center; gap:7px; white-space:nowrap; transition: filter .15s ease, transform .12s ease, opacity .15s ease; }
+  #view-challenge .cc-btn-split button:hover{ filter:brightness(1.06); opacity:1; }
+  #view-challenge .cc-btn-split button:active{ transform:scale(0.97); }
+  #view-challenge .cc-btn-split button:disabled{ opacity:0.4; cursor:not-allowed; transform:none; filter:none; }
+  #view-challenge .cc-btn-split .cc-btn-generate{ background:var(--cc-split-left); color:#fff; clip-path:polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%); padding:11px 24px 11px 18px; font-size:13.5px; }
+  #view-challenge .cc-btn-split .cc-btn-start{ background:var(--cc-split-right); color:#082036; clip-path:polygon(12px 0, 100% 0, 100% 100%, 0 100%); margin-left:-9px; padding:11px 20px 11px 25px; font-size:13.5px; }
+  #view-challenge .cc-btn-split .cc-btn-start svg{ width:13px; height:13px; fill:#082036; flex-shrink:0; transform:translateY(-0.03em); }   /* tip level with the middle of the "S" (desktop only; phones are already level) */
+  #view-challenge[data-mode="mixed"] .cc-btn-split .cc-btn-generate{ display:none; }
+  #view-challenge[data-mode="mixed"] .cc-btn-split .cc-btn-start{ clip-path:none; margin-left:0; padding:11px 30px; }
+  @media (max-width: 640px){
+    /* compact button (sized by its labels, not stretched); the estimate sits in the left corner of the freed space */
+    #view-challenge .cc-btn-split{ flex:0 0 auto; margin-left:12px; }
+    #view-challenge .cc-btn-split button{ flex:0 0 auto; }
+    #view-challenge .cc-btn-split .cc-btn-generate{ padding:13px 18px 13px 13px; font-size:13px; }
+    #view-challenge .cc-btn-split .cc-btn-start{ padding:13px 14px 13px 20px; font-size:13px; gap:6px; }
+    #view-challenge .cc-btn-split .cc-btn-start svg{ width:12px; height:12px; transform:none; }
+    #view-challenge[data-mode="mixed"] .cc-btn-split .cc-btn-start{ padding:13px 26px; }
+    #view-challenge .cc-summary-est{ flex:1; align-items:flex-start; }
+  }
   /* keep the fixed bar clear of the phone's home indicator */
   #view-challenge .cc-summary-strip{ bottom:calc(16px + env(safe-area-inset-bottom, 0px)); }
   @media (max-width:640px){
@@ -1537,7 +1562,7 @@
   /* phone only */
   @media (max-width: 640px){
     #view-challengedetails .cd-page{ padding-top:max(24px, calc(env(safe-area-inset-top, 0px) + 8px)); padding-bottom:220px; }
-    #view-challengedetails .cd-summary-strip{ padding:14px 14px 14px 12px; left:14px; right:14px; bottom:calc(12px + env(safe-area-inset-bottom, 0px)); }
+    #view-challengedetails .cd-summary-strip{ padding:19px 14px 19px 14px; left:14px; right:14px; bottom:calc(12px + env(safe-area-inset-bottom, 0px)); }
     #view-challengedetails .cd-sl-tag{ font-size:10.5px; color:var(--feature-accent-dim); font-weight:700; text-transform:uppercase; letter-spacing:0.04em; }
     #view-challengedetails .cd-sl-title{ font-family:'Sora', sans-serif; font-weight:700; font-size:14.5px; margin-top:3px; }
     #view-challengedetails .cd-sl-desc{ font-size:12px; color:var(--feature-accent-dim); margin-top:4px; line-height:1.4; }

@@ -1,5 +1,5 @@
-// Bump this version string whenever you deploy changes so old caches get replaced.
-const CACHE_VERSION = 'numbers-v36';
+// Bump this version string whenever you deploy changes so devices notice a new version.
+const CACHE_VERSION = 'numbers-v42';
 const CACHE_NAME = `numbers-cache-${CACHE_VERSION}`;
 
 const ASSETS = [
@@ -30,16 +30,19 @@ const ASSETS = [
   './icons/apple-touch-icon.png'
 ];
 
+// INSTALL: download the whole new version into its own cache, straight from the server
+// (cache:'reload' skips the browser's HTTP cache so we never save stale copies).
+// We do NOT call skipWaiting() here: a new version waits quietly until the user taps
+// "Refresh" on the update message, so the app never switches versions mid-use.
 self.addEventListener('install', (event) => {
-  // Cache each file separately so one missing icon can't make the whole install fail.
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) =>
-      Promise.all(ASSETS.map((url) => cache.add(url).catch(() => {})))
+      Promise.all(ASSETS.map((url) => cache.add(new Request(url, { cache: 'reload' })).catch(() => {})))
     )
   );
-  self.skipWaiting();
 });
 
+// ACTIVATE: delete caches from older versions and take control of open pages.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -48,29 +51,35 @@ self.addEventListener('activate', (event) => {
           .filter((key) => key.startsWith('numbers-cache-') && key !== CACHE_NAME)
           .map((key) => caches.delete(key))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Network-first for EVERYTHING on this site: when online, every device always gets the newest
-// deployed files (this is what keeps phone and laptop in step); the cache is only the offline fallback.
+// The page sends this when the user taps "Refresh" on the update message.
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
+});
+
+// FETCH: cache-first. Files come from this version's saved copy (instant, works offline);
+// anything not saved yet is fetched from the network and saved for next time.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
   if (new URL(request.url).origin !== self.location.origin) return;
 
   event.respondWith(
-    fetch(request, { cache: 'no-cache' })
-      .then((response) => {
-        if (response && response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+    caches.open(CACHE_NAME).then((cache) => {
+      const isPage = request.mode === 'navigate';
+      return cache.match(request, { ignoreSearch: isPage }).then((cached) => {
+        if (cached) return cached;
+        if (isPage) {
+          return cache.match('./index.html').then((page) => page || fetch(request));
         }
-        return response;
-      })
-      .catch(() =>
-        caches.match(request).then((cached) => cached || (request.mode === 'navigate' ? caches.match('./index.html') : undefined))
-      )
+        return fetch(request).then((response) => {
+          if (response && response.ok) cache.put(request, response.clone());
+          return response;
+        });
+      });
+    })
   );
 });

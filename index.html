@@ -17,9 +17,56 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Numbers">
 
+<!-- Splash + update message: inline on purpose, so they appear before style.css loads -->
+<style>
+#numbersSplash{position:fixed;top:0;right:0;bottom:0;left:0;z-index:99999;background:#14171C;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .25s ease;}
+#numbersSplash.hide{opacity:0;pointer-events:none;}
+#numbersSplash img{width:88px;height:88px;border-radius:20px;display:block;}
+#numbersSplash .sp-name{font:700 22px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.04em;color:#FFFFFF;}
+#numbersSplash img,#numbersSplash .sp-name{opacity:0;transition:opacity .15s ease;}
+#numbersSplash .sp-ready{opacity:1;}
+#numbersSplash .sp-bar{position:relative;width:96px;height:3px;border-radius:3px;background:rgba(255,255,255,.18);overflow:hidden;}
+#numbersSplash .sp-bar::after{content:"";position:absolute;top:0;left:0;bottom:0;width:40%;border-radius:3px;background:#FFFFFF;animation:spSlide 1s ease-in-out infinite;}
+@keyframes spSlide{0%{transform:translateX(-100%);}100%{transform:translateX(250%);}}
+@media (prefers-reduced-motion:reduce){#numbersSplash{transition:none;}#numbersSplash .sp-bar::after{animation:none;width:100%;}}
+
+#updateToast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:99998;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 24px);padding:10px 10px 10px 16px;border-radius:14px;background:#14171C;color:#FFFFFF;font:600 14px/1.2 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.28);}
+#updateToast[hidden]{display:none;}
+#updateToast button{flex:none;border:0;border-radius:9px;padding:8px 14px;background:#FFFFFF;color:#14171C;font:700 13px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;cursor:pointer;}
+#updateToast button:disabled{opacity:.6;cursor:default;}
+</style>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- SPLASH: shown instantly, hidden by the script after keys.js once the app is ready -->
+<div id="numbersSplash" aria-hidden="true">
+  <img id="spIcon" alt="" onerror="this.style.display='none'">
+  <div class="sp-name" id="spName"></div>
+  <div class="sp-bar"></div>
+</div>
+<script>
+  // Splash name + icon come from manifest.json, so each copy of the app (public / beta) shows its own.
+  (function () {
+    var icon = document.getElementById('spIcon');
+    var nameEl = document.getElementById('spName');
+    function show(name, src) {
+      nameEl.textContent = name;
+      nameEl.classList.add('sp-ready');
+      icon.onload = function () { icon.classList.add('sp-ready'); };
+      icon.src = src;
+    }
+    function fallback() { show(document.title.split(' \u2014 ')[0], 'icons/icon-192.png'); }
+    fetch('manifest.json').then(function (r) { return r.json(); }).then(function (m) {
+      var list = (m.icons || []).filter(function (i) { return !i.purpose || i.purpose.indexOf('any') !== -1; });
+      // Smallest "any" icon that is at least 176px (88px at 2x), else the biggest one available.
+      list.sort(function (a, b) { return parseInt(a.sizes, 10) - parseInt(b.sizes, 10); });
+      var pick = list.filter(function (i) { return parseInt(i.sizes, 10) >= 176; })[0] || list[list.length - 1];
+      if (!pick) return fallback();
+      show(m.short_name || m.name || document.title, new URL(pick.src, new URL('manifest.json', location.href)).href);
+    }).catch(fallback);
+  })();
+</script>
 
 <div id="app">
 
@@ -324,12 +371,12 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
         Back
       </button>
-      <div class="cc-topbar-title">Create a challenge</div>
+      <div class="cc-topbar-title" id="ccTopbarTitle">Create a challenge</div>
       <div style="width:60px;"></div>
     </div>
   </div>
 
-  <div class="cc-page-sub">Pick the skills to include, set a difficulty for each, and share the code — whoever plays it gets your exact set of questions.</div>
+  <div class="cc-page-sub" id="ccPageSub">Pick the skills to include, set a difficulty for each, and share the code — whoever plays it gets your exact set of questions.</div>
 
   <div class="cc-section-label">Skills to include</div>
   <div class="cc-skill-toggle-grid" id="ccSkillGrid">
@@ -344,7 +391,7 @@
 
   <div class="cc-section-label cc-qcount-section-label">Number of questions</div>
   <div class="cc-qcount-card">
-    <div class="cc-qcount-label">Questions in this challenge</div>
+    <div class="cc-qcount-label" id="ccQcountLabel">Questions in this challenge</div>
     <div class="cc-qcount-bar" id="ccQcountBar">
       <button class="cc-qcount-opt active" data-n="15">15</button>
       <button class="cc-qcount-opt" data-n="30">30</button>
@@ -363,7 +410,7 @@
     </div>
   <div class="cc-summary-strip">
     <div class="cc-summary-left">
-      <div class="cc-sl-tag">Your challenge</div>
+      <div class="cc-sl-tag" id="ccSlTag">Your challenge</div>
       <div class="cc-sl-title" id="ccSummaryTitle">2 skills selected</div>
       <div class="cc-sl-desc" id="ccSummaryDesc">Halving, × 2</div>
     </div>
@@ -372,10 +419,15 @@
         <div class="num" id="ccSummaryEst">1m 0s</div>
         <div class="lbl">Est. time</div>
       </div>
-      <button class="cc-btn-generate" id="ccBtnGenerate" disabled>
-        Generate code
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-      </button>
+      <!-- one button split on a diagonal: left = Generate code (blue), right = Start (red).
+           In Mixed drill mode (view-challenge[data-mode="mixed"]) the left half is hidden and Start fills the button. -->
+      <div class="cc-btn-split" id="ccBtnSplit">
+        <button class="cc-btn-generate" id="ccBtnGenerate" disabled>Generate code</button>
+        <button class="cc-btn-start" id="ccBtnStart" disabled>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg>
+          Start
+        </button>
+      </div>
     </div>
   </div>
   </div>
@@ -866,20 +918,9 @@
   </div>
 </div>
 
-<!-- mixed drill: coming soon -->
-<div class="modal-overlay" id="mixedSoonModal">
-  <div class="soon-modal" role="dialog" aria-labelledby="soonTitle">
-    <button class="dm-close" id="btnSoonClose" aria-label="Close">✕</button>
-    <div class="soon-icon">
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#007EA7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/>
-      </svg>
-    </div>
-    <div class="soon-eyebrow">Feeling brave?</div>
-    <div class="soon-title" id="soonTitle">Mixed drill is coming soon</div>
-    <p class="soon-text">We're still building the setup for it: choosing which skills go in the mix and how hard each one is. Until then, pick a single skill above.</p>
-    <button class="soon-btn" id="btnSoonOk">Got it</button>
-  </div>
+<div id="updateToast" hidden role="status">
+  <span>Update ready</span>
+  <button type="button" id="updateToastBtn">Refresh</button>
 </div>
 
 <input type="file" id="importFileInput" accept=".json" style="display:none;">
@@ -901,21 +942,72 @@
 <script src="js/keys.js"></script>
 
 <script>
-  // Register service worker for offline support + installability.
+  // SPLASH: hide once every script above has run. SPLASH_MIN_MS = shortest time it stays up
+  // (set to 0 to hide it the instant the app is ready).
+  (function () {
+    var SPLASH_MIN_MS = 700;
+    var el = document.getElementById('numbersSplash');
+    if (!el) return;
+    var wait = Math.max(0, SPLASH_MIN_MS - performance.now());
+    setTimeout(function () {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          el.classList.add('hide');
+          setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
+        });
+      });
+    }, wait);
+  })();
+</script>
+
+<script>
+  // Service worker: the app opens from saved files; a newer version downloads in the background
+  // and waits. When it is ready, an "Update ready" message appears; tapping Refresh switches over.
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    });
-    // When a newer service worker takes over (i.e. a new version was deployed), reload once
-    // so every device ends up on the same fresh files instead of a stale cached mix.
-    if (navigator.serviceWorker.controller) {
-      let reloaded = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (reloaded) return;
+    (function () {
+      var toast = document.getElementById('updateToast');
+      var btn = document.getElementById('updateToastBtn');
+      var waitingWorker = null;
+      var userAskedUpdate = false;
+
+      function offerUpdate(worker) {
+        waitingWorker = worker;
+        toast.hidden = false;
+      }
+
+      btn.addEventListener('click', function () {
+        if (!waitingWorker) return;
+        userAskedUpdate = true;
+        btn.disabled = true;
+        btn.textContent = 'Updating…';
+        waitingWorker.postMessage('SKIP_WAITING');
+      });
+
+      // Reload once, and only when the user tapped Refresh (not on the very first install).
+      var reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (!userAskedUpdate || reloaded) return;
         reloaded = true;
         location.reload();
       });
-    }
+
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
+          if (reg.waiting && navigator.serviceWorker.controller) offerUpdate(reg.waiting);
+          reg.addEventListener('updatefound', function () {
+            var incoming = reg.installing;
+            if (!incoming) return;
+            incoming.addEventListener('statechange', function () {
+              if (incoming.state === 'installed' && navigator.serviceWorker.controller) offerUpdate(incoming);
+            });
+          });
+          // An installed app can stay open for days: check for a new version whenever it comes back to the screen.
+          document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') reg.update().catch(function () {});
+          });
+        }).catch(function () {});
+      });
+    })();
   }
 </script>
 
