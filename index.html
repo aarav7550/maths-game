@@ -19,7 +19,7 @@
 
 <!-- Splash + update message: inline on purpose, so they appear before style.css loads -->
 <style>
-#numbersSplash{position:fixed;top:0;right:0;bottom:0;left:0;z-index:99999;background:#14171C;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .25s ease;}
+#numbersSplash{position:fixed;top:0;right:0;bottom:0;left:0;z-index:99999;background:#14171C;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .15s ease;}
 #numbersSplash.hide{opacity:0;pointer-events:none;}
 #numbersSplash img{width:88px;height:88px;border-radius:20px;display:block;}
 #numbersSplash .sp-name{font:700 22px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.04em;color:#FFFFFF;}
@@ -47,6 +47,10 @@
 </div>
 <script>
   // Splash name + icon come from manifest.json, so each copy of the app (public / beta) shows its own.
+  // Resolves once the browser has started drawing its first frame (so the loading screen is guaranteed to be seen).
+  window.__splashPainted = new Promise(function (resolve) {
+    requestAnimationFrame(function () { resolve(); });
+  });
   (function () {
     var icon = document.getElementById('spIcon');
     var nameEl = document.getElementById('spName');
@@ -942,21 +946,25 @@
 <script src="js/keys.js"></script>
 
 <script>
-  // SPLASH: hide once every script above has run. SPLASH_MIN_MS = shortest time it stays up
-  // (set to 0 to hide it the instant the app is ready).
+  // LOADING SCREEN. It hides once ALL of these are true: every script above has run, the browser has drawn
+  // at least one frame, and SPLASH_MIN_MS has passed since the page started loading (so a slow load never
+  // gets extra waiting added on top). Same behaviour on desktop and phone.
   (function () {
-    var SPLASH_MIN_MS = 700;
+    var SPLASH_MIN_MS = 800;
     var el = document.getElementById('numbersSplash');
     if (!el) return;
-    var wait = Math.max(0, SPLASH_MIN_MS - performance.now());
-    setTimeout(function () {
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () {
-          el.classList.add('hide');
-          setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
-        });
-      });
-    }, wait);
+    var done = false;
+    function hide() {
+      if (done) return;
+      done = true;
+      el.classList.add('hide');
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 250);
+    }
+    window.__splashPainted.then(function () {
+      setTimeout(hide, Math.max(0, SPLASH_MIN_MS - performance.now()));
+    });
+    // Safety net: never leave the screen up for more than 3s once the app is ready.
+    setTimeout(hide, 3000);
   })();
 </script>
 
