@@ -287,8 +287,28 @@ function updateMeta(){
   const attempted = state.currentIndex;
   const acc = attempted === 0 ? 100 : Math.round((state.correctCount/attempted)*100);
   metaAcc.textContent = `${acc}%`;
-  const avg = attempted === 0 ? null : state.times.reduce((a,b)=>a+b,0)/attempted/1000;
+  // avg time counts only questions that were actually answered (timed-out ones are left out)
+  const answered = answeredTimesMs(state.records);
+  const avg = answered.length === 0 ? null : answered.reduce((a,b)=>a+b,0)/answered.length/1000;
   metaAvg.textContent = avg === null ? '—' : `${avg.toFixed(1)}s`;
+}
+
+// Times (ms) of the questions the player actually answered; timed-out ones (no answer given) are skipped.
+function answeredTimesMs(records){
+  return records.filter(r => r.given !== null).map(r => r.timeMs);
+}
+
+// What gets saved with each session so it can be reviewed later in History.
+// k = skill, q = question text, a = right answer, g = what you typed (null = timed out), t = time in ms.
+//   wrong = every wrong or timed-out question, in the order played
+//   slow  = the SLOW_KEEP slowest questions you got right (wrong ones are already in `wrong`)
+const SLOW_KEEP = 5;
+function buildSessionDetails(records){
+  const slim = r => ({ k: r.skillKey, q: r.text, a: r.answerText || r.answer, g: r.given, t: Math.round(r.timeMs) });
+  return {
+    wrong: records.filter(r => !r.correct).map(slim),
+    slow: records.filter(r => r.correct).sort((a,b) => b.timeMs - a.timeMs).slice(0, SLOW_KEEP).map(slim)
+  };
 }
 
 function finishRound(){
@@ -299,8 +319,13 @@ function finishRound(){
   btnHistory.disabled = false;
 
   const accuracy = Math.round((state.correctCount/state.totalQuestions)*100);
-  const avgTime = state.times.reduce((a,b)=>a+b,0)/state.times.length/1000;
-  const bestTime = Math.min(...state.times)/1000;
+  // Avg / best time use only the questions that were actually answered. A timed-out question has no
+  // answer, and its "time" is just the whole timer running out, so it would unfairly drag the average up.
+  // (If every question timed out there is nothing to average, so we fall back to all the times.)
+  const answeredTimes = answeredTimesMs(state.records);
+  const timesForStats = answeredTimes.length ? answeredTimes : state.times;
+  const avgTime = timesForStats.reduce((a,b)=>a+b,0)/timesForStats.length/1000;
+  const bestTime = Math.min(...timesForStats)/1000;
 
   document.getElementById('resAcc').textContent = accuracy + '%';
   document.getElementById('resAvg').textContent = avgTime.toFixed(1) + 's';
@@ -329,7 +354,8 @@ function finishRound(){
     bestTime: bestTime,
     config: configSnapshot,
     fromChallenge: state.fromChallenge,
-    practice: state.practiceMode
+    practice: state.practiceMode,
+    details: buildSessionDetails(state.records)   // wrong + slowest questions, shown when you tap the session in History
   };
 
   if(state.practiceMode){
@@ -371,12 +397,13 @@ function renderResultsBreakdown(){
       const subset = records.filter(r => r.skillKey === key);
       if(subset.length === 0) return;
       const acc = Math.round(subset.filter(r => r.correct).length / subset.length * 100);
-      const avg = subset.reduce((a,r)=>a+r.timeMs,0)/subset.length/1000;
+      const answeredSubset = subset.filter(r => r.given !== null);   // timed-out questions don't count toward avg time
+      const avgText = answeredSubset.length ? (answeredSubset.reduce((a,r)=>a+r.timeMs,0)/answeredSubset.length/1000).toFixed(1) + 's' : '—';
       const row = document.createElement('div');
       row.className = 'skill-row';
       row.innerHTML = `
         <span class="name">${skillDisplayLabels[key]}</span>
-        <span class="nums"><span>avg <b>${avg.toFixed(1)}s</b></span><span>acc <b>${acc}%</b></span></span>
+        <span class="nums"><span>avg <b>${avgText}</b></span><span>acc <b>${acc}%</b></span></span>
       `;
       perSkillList.appendChild(row);
     });

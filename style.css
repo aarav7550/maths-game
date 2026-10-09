@@ -692,9 +692,9 @@
     flex-direction:column; align-items:center; padding:24px; overflow-y:auto;
     background:#F3FAFB; color:var(--r-text);
   }
-  #view-results .page{ width:100%; max-width:480px; margin-top:8px; }
+  #view-results .page{ width:100%; max-width:480px; margin-top:32px; }
 
-  #view-results .page-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  #view-results .page-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:26px; }
   #view-results .back-link{
     display:flex; align-items:center; gap:6px; background:none; border:none; cursor:pointer;
     color:var(--r-dim); font-family:inherit; font-size:14px; font-weight:600;
@@ -768,6 +768,8 @@
 
   @media (max-width:480px){
     #view-results{ padding:16px; }
+    #view-results .page{ margin-top:20px; }
+    #view-results .page-head{ margin-bottom:18px; }
     #view-results .card{ padding:18px; }
   }
 
@@ -851,15 +853,26 @@
   .day-header:first-child{ margin-top:8px; }
   .session-row{
     position:relative;
-    display:grid; grid-template-columns: 1fr 74px 96px 56px 64px 74px;
-    align-items:center; column-gap:12px;
-    background:var(--card); border:1px solid var(--line); border-radius:12px; padding:13px 18px;
+    --strip-w:18px;   /* the grey review strip on the right edge; the content keeps clear of it */
+    --row-pr:calc(var(--strip-w) + 16px);   /* right padding: content (and the Practice tag) stay clear of the strip, on every row */
+    --m-cols:4.2em 2.89em 4.37em 4.44em;    /* phone columns: level | Qs | avg | acc (used by the three phone layouts below) */
+    /* Desktop: each track is as wide as the text of  Addition | 12:52 AM | Difficult | 30 Qs | 5.4s avg | 98% acc,
+       and space-between spreads the tracks with equal gaps, so that row has identical gaps and every row keeps the same columns */
+    display:grid; grid-template-columns: 55px 65px 48px 39px 59px 60px;
+    justify-content:space-between; align-items:center; column-gap:8px;
+    background:var(--card); border:1px solid var(--line); border-radius:12px; padding:13px var(--row-pr) 13px 18px;
+    transition:transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s ease, border-color .18s ease;
   }
   .sr-line1, .sr-line2{ display:contents; }
-  .session-row .sr-cell{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-variant-numeric:tabular-nums; font-size:13.5px; color:var(--ink-mid); }
+  .session-row .sr-cell{ min-width:0; width:max-content; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-variant-numeric:tabular-nums; font-size:13.5px; color:var(--ink-mid); }
   .session-row .sr-skill{ font-weight:600; color:var(--primary); }
-  .session-row .sr-qs{ text-align:center; }
-  .session-row .sr-avg, .session-row .sr-acc{ font-weight:700; color:var(--primary); text-align:right; }
+  /* a wider value than the sample (Very Difficult, 100 Qs, 10.5s avg...) just spills evenly into the gaps beside it */
+  .session-row .sr-skill{ justify-self:start; max-width:80px; }
+  .session-row .sr-time{ justify-self:start; }
+  .session-row .sr-level, .session-row .sr-level-static{ text-align:center; justify-self:center; max-width:96px; }
+  .session-row .sr-qs{ text-align:center; justify-self:center; }
+  .session-row .sr-avg{ font-weight:700; color:var(--primary); text-align:center; justify-self:center; }
+  .session-row .sr-acc{ font-weight:700; color:var(--primary); text-align:right; justify-self:end; }
   .sr-level{ cursor:pointer; }
   .sr-level:hover{ color:var(--primary); text-decoration:underline dotted; }
 
@@ -969,16 +982,17 @@
        last (acc) is right-aligned so its text ends exactly on the right padding */
     #view-history .sr-line1, #view-history .sr-line2{
       display:grid; grid-column:1/3;
-      grid-template-columns: 5.1em 3.3em 3.92em 5.1em;
+      grid-template-columns: var(--m-cols);
       justify-content:space-between; column-gap:6px;
       font-size:clamp(11px, 3.4vw, 13.5px);
     }
     #view-history .sr-line1{ align-items:baseline; }
     #view-history .sr-line2{ align-items:center; }
-    #view-history .sr-line1 .sr-skill{ grid-column:1; font-size:1.04em; overflow:visible; text-overflow:clip; }
+    #view-history .sr-line1 .sr-skill{ grid-column:1; font-size:1.04em; max-width:none; overflow:visible; text-overflow:clip; }
     #view-history .sr-line1 .sr-time{ grid-column:2 / 5; font-weight:600; overflow:visible; text-overflow:clip; text-align:left; }
     #view-history .sr-line2 .sr-cell{ font-size:1em; white-space:nowrap; overflow:visible; text-overflow:clip; }
-    #view-history .sr-line2 .sr-level, #view-history .sr-line2 .sr-level-static{ text-align:left; }
+    /* the level starts on the same column as the skill name above it (older and newer rows alike) */
+    #view-history .sr-line2 .sr-level, #view-history .sr-line2 .sr-level-static{ text-align:left; justify-self:start; max-width:none; }
     #view-history .sr-line2 .sr-qs, #view-history .sr-line2 .sr-avg{ text-align:left; }
     #view-history .sr-line2 .sr-acc{ text-align:right; }
   }
@@ -1013,8 +1027,7 @@
   #view-history-skill .sessions-section .section-label{ text-align:center; margin:0 0 12px; }
   /* no skill column on this page (it is already one skill): 5 fixed columns */
   #view-history-skill .session-row{
-    grid-template-columns: 68px 92px 46px 72px 68px;
-    justify-content:space-between;
+    grid-template-columns: 66px 48px 39px 59px 60px;
   }
   #view-history-skill .session-row .sr-time{ font-weight:600; }
 
@@ -1059,12 +1072,13 @@
     #view-history-skill .sr-line1 .sr-time{ font-size:14px; font-weight:600; color:var(--ink-mid); overflow:visible; }
     #view-history-skill .sr-line2{
       display:grid; grid-column:1/3;
-      grid-template-columns: 5.1em 3.3em 3.92em 5.1em;
+      grid-template-columns: var(--m-cols);
       justify-content:space-between; align-items:center; column-gap:6px;
       font-size:clamp(11px, 3.4vw, 13.5px);
     }
     #view-history-skill .sr-line2 .sr-cell{ font-size:1em; white-space:nowrap; overflow:visible; text-overflow:clip; }
-    #view-history-skill .sr-line2 .sr-level, #view-history-skill .sr-line2 .sr-level-static{ text-align:left; }
+    /* the level starts on the same column as the time above it */
+    #view-history-skill .sr-line2 .sr-level, #view-history-skill .sr-line2 .sr-level-static{ text-align:left; justify-self:start; max-width:none; }
     #view-history-skill .sr-line2 .sr-qs, #view-history-skill .sr-line2 .sr-avg{ text-align:left; }
     #view-history-skill .sr-line2 .sr-acc{ text-align:right; }
 
@@ -1073,21 +1087,21 @@
       grid-template-columns: 1fr auto; grid-template-rows: auto auto;
       row-gap:8px; padding:14px 14px;
     }
-    #view-history-full .sr-line1{
+    #view-history-full .sr-line1, #view-history-full .sr-line2{
       display:grid; grid-column:1/3;
-      grid-template-columns: minmax(0,1.2fr) minmax(0,0.75fr) minmax(0,0.8fr) minmax(0,0.75fr);
-      align-items:baseline; column-gap:10px;
+      grid-template-columns: var(--m-cols);
+      justify-content:space-between; column-gap:6px;
+      font-size:clamp(11px, 3.4vw, 13.5px);
     }
-    #view-history-full .sr-line1 .sr-skill{ font-size:14px; text-align:left; grid-column:1; }
-    #view-history-full .sr-line1 .sr-time{ font-size:13.5px; font-weight:600; color:var(--ink-mid); white-space:nowrap; text-align:left; grid-column:2 / 5; overflow:visible; }
-    #view-history-full .sr-line2{
-      display:grid; grid-column:1/3;
-      grid-template-columns: minmax(0,1.2fr) minmax(0,0.75fr) minmax(0,0.8fr) minmax(0,0.75fr);
-      align-items:center; column-gap:10px;
-    }
-    #view-history-full .sr-line2 .sr-cell{ font-size:13.5px; white-space:normal; overflow:visible; text-overflow:clip; }
-    #view-history-full .sr-line2 .sr-level, #view-history-full .sr-line2 .sr-level-static{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
-    #view-history-full .sr-line2 .sr-qs, #view-history-full .sr-line2 .sr-avg, #view-history-full .sr-line2 .sr-acc{ text-align:left; }
+    #view-history-full .sr-line1{ align-items:baseline; }
+    #view-history-full .sr-line2{ align-items:center; }
+    #view-history-full .sr-line1 .sr-skill{ font-size:1.04em; text-align:left; grid-column:1; max-width:none; overflow:visible; text-overflow:clip; }
+    #view-history-full .sr-line1 .sr-time{ font-size:1em; font-weight:600; color:var(--ink-mid); white-space:nowrap; text-align:left; grid-column:2 / 5; overflow:visible; }
+    #view-history-full .sr-line2 .sr-cell{ font-size:1em; white-space:nowrap; overflow:visible; text-overflow:clip; }
+    /* the level starts on the same column as the skill name above it */
+    #view-history-full .sr-line2 .sr-level, #view-history-full .sr-line2 .sr-level-static{ text-align:left; justify-self:start; max-width:none; }
+    #view-history-full .sr-line2 .sr-qs, #view-history-full .sr-line2 .sr-avg{ text-align:left; }
+    #view-history-full .sr-line2 .sr-acc{ text-align:right; }
   }
 
   /* ---------- confirm modal ---------- */
@@ -1242,7 +1256,7 @@
     background:var(--card); border:1px solid var(--line); color:var(--ink-dim);
   }
   .sr-prac-cell{ display:none; }
-  .session-row.is-practice .sr-prac-cell{ display:block; position:absolute; top:-9px; right:14px; overflow:visible; }
+  .session-row.is-practice .sr-prac-cell{ display:block; position:absolute; top:-9px; right:var(--row-pr); overflow:visible; }
   /* The chip pokes 9px above its row, so ONLY practice rows get a little extra space above them.
      Normal rows keep the regular gap between them. Kept small (4px) so two practice rows in a
      row sit only slightly further apart than normal rows. */
@@ -1742,3 +1756,71 @@
   .sc-col{ padding:16px 18px 18px; }
   .sc-col + .sc-col{ border-top:1px solid var(--line); }
 }
+
+/* ---------- History: tap a session row to review it ---------- */
+.session-row.has-details{ cursor:pointer; }
+/* A hovered row is lifted (transform), which makes it its own layer; raise it (and any row showing the level popover)
+   so the popover is drawn over the rows below instead of underneath them. */
+.session-row:hover, .session-row:focus-within{ z-index:5; }
+.session-row:has(.level-popover.show){ z-index:6; }
+/* rows that open the review float up a little on hover and press down when tapped */
+@media (hover:hover){
+  .session-row.has-details:hover{ border-color:var(--primary); transform:translateY(-2px); box-shadow:0 8px 18px rgba(0,23,31,0.10); }
+  .session-row.has-details:hover::after{ transform:translateY(-50%) translateX(1.5px); }
+}
+.session-row.has-details:active{ transform:translateY(0) scale(0.99); box-shadow:0 2px 6px rgba(0,23,31,0.08); transition-duration:.08s; }
+.session-row.has-details::after{ transition:transform .18s cubic-bezier(.2,.8,.2,1); }
+/* phones have no hover, so the "float" is always visible there: a resting shadow, and a clear press-in when tapped */
+@media (hover:none){
+  .session-row.has-details{ box-shadow:0 3px 10px rgba(0,23,31,0.09); -webkit-tap-highlight-color:transparent; }
+  .session-row.has-details:active{ transform:scale(0.97); box-shadow:0 1px 3px rgba(0,23,31,0.08); }
+}
+@media (prefers-reduced-motion:reduce){
+  .session-row, .session-row.has-details::after{ transition:none; }
+  .session-row.has-details:hover, .session-row.has-details:active{ transform:none; }
+}
+/* grey strip on the right edge of a reviewable row, with a white arrow on it */
+.session-row.has-details::before{
+  content:""; position:absolute; top:0; right:0; bottom:0; width:var(--strip-w);
+  background:color-mix(in srgb, var(--ink-faint) 60%, var(--ink-dim)); border-radius:0 11px 11px 0;
+}
+.session-row.has-details::after{
+  content:""; position:absolute; top:50%; right:calc((var(--strip-w) - 6px) / 2); width:6px; height:12px; transform:translateY(-50%);
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 12'%3E%3Cpath d='M1.2 1L4.8 6L1.2 11' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.session-row.has-details:hover::before{ background:var(--primary); }
+/* phones: slightly thinner strip; the content shifts left by the same amount on every row */
+@media (max-width:860px){
+  #view-history .session-row{ --strip-w:15px; --row-pr:calc(var(--strip-w) + 10px); padding-right:var(--row-pr); }
+}
+@media (max-width:640px){
+  #view-history-skill .session-row, #view-history-full .session-row{ --strip-w:15px; --row-pr:calc(var(--strip-w) + 10px); padding-right:var(--row-pr); }
+}
+
+.rv-modal{
+  background:var(--card); border-radius:20px; width:100%; max-width:520px;
+  max-height:min(86vh, 680px); display:flex; flex-direction:column; overflow:hidden;
+  box-shadow:0 24px 60px rgba(0,23,31,0.25);
+}
+.rv-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex:none; padding:18px 20px 14px; border-bottom:1px solid var(--line); }
+.rv-title{ font-family:'Sora',sans-serif; font-weight:800; font-size:18px; color:var(--ink); }
+.rv-line1{ display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 12px; }
+.rv-sub{ font-size:12.5px; color:var(--ink-dim); line-height:1.5; }
+.rv-body{ overflow-y:auto; min-height:0; padding:4px 20px 20px; }
+.rv-section-title{ font-family:'Sora',sans-serif; font-weight:700; font-size:13px; color:var(--ink); margin:16px 0 8px; }
+.rv-row{
+  display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 12px;
+  background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+}
+.rv-row + .rv-row{ margin-top:7px; }
+.rv-q{ font-weight:700; font-size:14px; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.rv-tag{ font-size:11px; font-weight:400; color:var(--ink-dim); margin-left:7px; }
+.rv-nums{ display:flex; gap:8px; font-size:12px; font-variant-numeric:tabular-nums; }
+.rv-you{ color:var(--bad); }
+.rv-right{ color:var(--ink-dim); }
+.rv-t{ color:var(--ink); font-weight:700; }
+.rv-empty{ font-size:13px; color:var(--ink-dim); padding:4px 2px; }
+
+.rv-stats{ display:grid; grid-template-columns:4.4em 6.4em 5.4em; column-gap:10px; margin-top:9px; font-size:13px; font-variant-numeric:tabular-nums; }
+.rv-st{ white-space:nowrap; }
+.rv-st.rv-avg, .rv-st.rv-acc{ font-weight:700; color:var(--primary); }

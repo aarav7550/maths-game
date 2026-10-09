@@ -30,9 +30,9 @@
 @keyframes spSlide{0%{transform:translateX(-100%);}100%{transform:translateX(250%);}}
 @media (prefers-reduced-motion:reduce){#numbersSplash{transition:none;}#numbersSplash .sp-bar::after{animation:none;width:100%;}}
 
-#updateToast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:99998;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 24px);padding:10px 10px 10px 16px;border-radius:14px;background:#14171C;color:#FFFFFF;font:600 14px/1.2 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.28);}
+#updateToast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:99998;display:flex;align-items:center;gap:12px;width:max-content;max-width:calc(100vw - 24px);padding:10px 10px 10px 16px;border-radius:14px;background:#14171C;color:#FFFFFF;font:600 14px/1.2 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.28);}
 #updateToast[hidden]{display:none;}
-#updateToast button{flex:none;border:0;border-radius:9px;padding:8px 14px;background:#FFFFFF;color:#14171C;font:700 13px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;cursor:pointer;}
+#updateToast button{flex:none;min-width:112px;border:0;border-radius:9px;padding:8px 14px;background:#FFFFFF;color:#14171C;font:700 13px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;cursor:pointer;}
 #updateToast button:disabled{opacity:.6;cursor:default;}
 </style>
 <link rel="stylesheet" href="style.css">
@@ -919,6 +919,20 @@
       <button class="btn-ghost" id="btnChallengeCopy">Copy</button>
       <button class="btn-primary" id="btnChallengeShowClose">Done</button>
     </div>
+  </div>
+</div>
+
+<!-- History: review a session's wrong / slowest questions -->
+<div class="modal-overlay" id="reviewModal">
+  <div class="rv-modal" role="dialog" aria-labelledby="rvTitle">
+    <div class="rv-head">
+      <div>
+        <div class="rv-line1"><span class="rv-title" id="rvTitle"></span><span class="rv-sub" id="rvSub"></span></div>
+        <div class="rv-stats" id="rvStats"></div>
+      </div>
+      <button class="sc-close" id="btnReviewClose" aria-label="Close" data-default>&#10005;</button>
+    </div>
+    <div class="rv-body" id="rvBody"></div>
   </div>
 </div>
 

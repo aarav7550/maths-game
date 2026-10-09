@@ -82,7 +82,12 @@ function sessionRowHtml(s, withSkill){
     + '<div class="sr-cell sr-avg">' + s.avgTime.toFixed(1) + 's avg</div>'
     + '<div class="sr-cell sr-acc">' + s.accuracy + '% acc</div>'
     + '</div>';
-  return '<div class="session-row' + (s.practice ? ' is-practice' : '') + '">' + line1 + line2 + popover + '</div>';
+  // Rounds saved with question details can be tapped to review them (see "SESSION REVIEW" below)
+  const d = s.details;
+  const hasDetails = !!(d && (Array.isArray(d.all) || (Array.isArray(d.wrong) && Array.isArray(d.slow))));
+  return '<div class="session-row' + (s.practice ? ' is-practice' : '') + (hasDetails ? ' has-details' : '') + '"'
+    + (hasDetails ? ' data-date="' + s.date + '" data-prac="' + (s.practice ? 1 : 0) + '"' : '') + '>'
+    + line1 + line2 + popover + '</div>';
 }
 
 // Rows grouped under a day header ("Today", "Yesterday", "7 Sep, 2026"). `list` must already be
@@ -168,6 +173,94 @@ function wireLevelPopovers(list){
 }
 document.addEventListener('click', closeLevelPop);
 
+// ============================================================
+// SESSION REVIEW — tap a session row to see its wrong / slowest questions
+// (data comes from `details`, saved by game.js buildSessionDetails; older sessions have none and aren't tappable)
+// ============================================================
+const reviewModal = document.getElementById('reviewModal');
+const rvTitleEl = document.getElementById('rvTitle');
+const rvSubEl = document.getElementById('rvSub');
+const rvStatsEl = document.getElementById('rvStats');
+const REVIEW_SLOW_SHOW = 5;   // how many of the slowest right answers the review lists
+const rvBodyEl = document.getElementById('rvBody');
+
+function escapeHtml(v){
+  return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function findRound(date, isPractice){
+  const list = isPractice ? practiceSessions : sessions;
+  return list.find(s => s.date === date) || null;
+}
+// Sessions normally save {wrong, slow}. (One test version saved every question as details.all; those still show, with wrong / slow worked out from it.)
+function reviewLists(d){
+  if(Array.isArray(d.all)){
+    return {
+      all: d.all,
+      wrong: d.all.filter(r => !r.c),
+      slow: d.all.filter(r => r.c).sort((a, b) => b.t - a.t).slice(0, REVIEW_SLOW_SHOW)
+    };
+  }
+  return { all: null, wrong: d.wrong, slow: d.slow };
+}
+// kind: 'wrong' | 'slow'
+function reviewRowHtml(r, kind, isMixed){
+  const tag = isMixed && r.k ? '<span class="rv-tag">' + escapeHtml(historySkillLabels[r.k] || r.k) + '</span>' : '';
+  let nums;
+  if(kind === 'slow'){
+    nums = '<span class="rv-t">' + (r.t / 1000).toFixed(1) + 's</span>';
+  } else {
+    nums = '<span class="rv-you">' + (r.g === null ? 'no answer' : 'you: ' + escapeHtml(r.g)) + '</span>'
+         + '<span class="rv-right">right: ' + escapeHtml(r.a) + '</span>'
+         + (r.g === null ? '' : '<span class="rv-t">' + (r.t / 1000).toFixed(1) + 's</span>');
+  }
+  return '<div class="rv-row"><div class="rv-q">' + escapeHtml(r.q) + tag + '</div><div class="rv-nums">' + nums + '</div></div>';
+}
+function openReview(s){
+  const isMixed = s.skill === 'mixed';
+  const lv = sessionLevelInfo(s);
+  const L = reviewLists(s.details);
+  rvTitleEl.textContent = (historySkillLabels[s.skill] || s.skill) + (s.practice ? ' · Practice' : '');
+  rvSubEl.textContent = fmtDayLabel(s.date) + ', ' + fmtTimeLabel(s.date) + ' · ' + lv.label;
+  // second row: fixed columns, avg + accuracy coloured like the Recent sessions rows
+  rvStatsEl.innerHTML = '<span class="rv-st rv-qs">' + (s.questions || '—') + ' Qs</span>'
+    + '<span class="rv-st rv-avg">' + Number(s.avgTime).toFixed(1) + 's avg</span>'
+    + '<span class="rv-st rv-acc">' + s.accuracy + '% acc</span>';
+
+  let html = '<div class="rv-section-title">Wrong or missed' + (L.wrong.length ? ' (' + L.wrong.length + ')' : '') + '</div>';
+  html += L.wrong.length
+    ? L.wrong.map(r => reviewRowHtml(r, 'wrong', isMixed)).join('')
+    : '<div class="rv-empty">No mistakes in this round.</div>';
+  if(L.slow.length){
+    html += '<div class="rv-section-title">Slowest right answers</div>' + L.slow.map(r => reviewRowHtml(r, 'slow', isMixed)).join('');
+  }
+  rvBodyEl.innerHTML = html;
+  rvBodyEl.scrollTop = 0;
+  reviewModal.classList.add('show');
+}
+function closeReview(){ reviewModal.classList.remove('show'); }
+function reviewIsOpen(){ return reviewModal.classList.contains('show'); }
+
+// One delegated listener per session list (the lists re-render, so nothing is bound per row).
+function wireRowReview(list){
+  list.addEventListener('click', (e) => {
+    if(e.target.closest('.sr-level') || e.target.closest('.level-popover')) return;   // those open the level popover instead
+    const row = e.target.closest('.session-row.has-details');
+    if(!row) return;
+    const s = findRound(Number(row.dataset.date), row.dataset.prac === '1');
+    if(s && s.details) openReview(s);
+  });
+}
+document.getElementById('btnReviewClose').addEventListener('click', closeReview);
+reviewModal.addEventListener('click', (e) => { if(e.target === reviewModal) closeReview(); });
+// Esc closes the review first (and stops there, so it can't also act as "go back a screen")
+window.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape' && reviewIsOpen()){
+    closeReview();
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+}, true);
+
 // ---------- icon-button tooltips (touch: long-press shows it; mouse: hover) ----------
 function wireTooltipBtn(btnId, tipId){
   const btn = document.getElementById(btnId), tip = document.getElementById(tipId);
@@ -231,20 +324,12 @@ const CHEVRON_SVG = '<svg class="sk-chevron" viewBox="0 0 24 24" fill="none" str
 function renderHistSkillGrid(){
   histSkillGridEl.innerHTML = '';
   SKILL_ORDER.forEach(key => {
-    const list = sessions.filter(s => s.skill === key);
-    const has = list.length > 0;
-    const avg = has ? list.reduce((a, s) => a + s.avgTime, 0) / list.length : null;
-    const acc = has ? Math.round(list.reduce((a, s) => a + s.accuracy, 0) / list.length) : null;
     const card = document.createElement('button');
     card.className = 'skill-card ' + SKILL_CLASS[key];
     card.dataset.skill = key;
     card.innerHTML =
       '<div class="sk-top"><div class="sk-top-left"><div class="sk-icon">' + SKILL_ICON[key] + '</div>'
-      + '<div class="sk-name">' + skillDisplayLabels[key] + '</div></div>' + CHEVRON_SVG + '</div>'
-      + '<div class="sk-nums">'
-      +   '<div class="sk-stat"><div class="num">' + (has ? avg.toFixed(1) + 's' : '—') + '</div><div class="lbl">Avg time</div></div>'
-      +   '<div class="sk-stat"><div class="num">' + (has ? acc + '%' : '—') + '</div><div class="lbl">Accuracy</div></div>'
-      + '</div>';
+      + '<div class="sk-name">' + skillDisplayLabels[key] + '</div></div>' + CHEVRON_SVG + '</div>';
     histSkillGridEl.appendChild(card);
   });
 }
@@ -269,6 +354,7 @@ function renderHistory(){
 }
 
 wireLevelPopovers(sessionsListEl);
+wireRowReview(sessionsListEl);
 histSkillGridEl.addEventListener('click', (e) => {
   const card = e.target.closest('.skill-card');
   if(card) openSkillDetail(card.dataset.skill);
@@ -335,6 +421,7 @@ function openSkillDetail(key){
 }
 
 wireLevelPopovers(skdListEl);
+wireRowReview(skdListEl);
 skdPaginationEl.addEventListener('click', (e) => {
   const btn = e.target.closest('.page-btn');
   if(!btn || btn.disabled || btn.classList.contains('active')) return;
@@ -381,6 +468,7 @@ function openFullHistory(){
 }
 
 wireLevelPopovers(fullListEl);
+wireRowReview(fullListEl);
 fullPaginationEl.addEventListener('click', (e) => {
   const btn = e.target.closest('.page-btn');
   if(!btn || btn.disabled || btn.classList.contains('active')) return;
