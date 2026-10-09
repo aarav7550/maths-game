@@ -35,6 +35,12 @@ function fmtTimeLabel(ts){
   return h + ':' + (m < 10 ? '0' : '') + m + ' ' + ap;
 }
 
+// The inside of the little "settings used for this level" box (shown on the session rows and in the review popup)
+function levelPopoverInner(lv){
+  return '<div class="lp-row"><span>Range</span><b>' + lv.range + '</b></div>'
+       + '<div class="lp-row"><span>Type</span><b>' + lv.type + '</b></div>';
+}
+
 function sessionLevelInfo(s){
   // Mixed rounds have no single range to show, so they get a plain non-clickable label.
   if(s.skill === 'mixed' || !s.config || !s.config.cfg) return { label: s.skill === 'mixed' ? 'Mixed' : '—', range: null, type: null };
@@ -65,12 +71,7 @@ function sessionRowHtml(s, withSkill){
   const levelCell = lv.range
     ? '<div class="sr-cell sr-level"><span class="sr-level-txt">' + lv.label + '</span></div>'
     : '<div class="sr-cell sr-level-static">' + lv.label + '</div>';
-  const popover = lv.range
-    ? '<div class="level-popover">'
-      + '<div class="lp-row"><span>Range</span><b>' + lv.range + '</b></div>'
-      + '<div class="lp-row"><span>Type</span><b>' + lv.type + '</b></div>'
-      + '</div>'
-    : '';
+  const popover = lv.range ? '<div class="level-popover">' + levelPopoverInner(lv) + '</div>' : '';
   const line1 = '<div class="sr-line1">'
     + (withSkill ? '<div class="sr-cell sr-skill">' + (historySkillLabels[s.skill] || s.skill) + '</div>' : '')
     + '<div class="sr-cell sr-time">' + fmtTimeLabel(s.date) + '</div>'
@@ -128,7 +129,7 @@ function pagerHtml(page, pages){
 let openLevelPop = null;
 function closeLevelPop(){ if(openLevelPop){ openLevelPop.classList.remove('show'); openLevelPop = null; } }
 function positionLevelPop(cell, pop){
-  const row = cell.closest('.session-row');
+  const row = cell.closest('.session-row, .rv-head');
   const txt = cell.querySelector('.sr-level-txt') || cell;
   const rowRect = row.getBoundingClientRect(), txtRect = txt.getBoundingClientRect();
   const anchorCenter = (txtRect.left - rowRect.left) + txtRect.width / 2;
@@ -142,7 +143,7 @@ function positionLevelPop(cell, pop){
   pop.style.left = left + 'px';
   pop.style.setProperty('--lp-arrow-x', (anchorCenter - left) + 'px');
 }
-function popFor(cell){ return cell.closest('.session-row').querySelector('.level-popover'); }
+function popFor(cell){ return cell.closest('.session-row, .rv-head').querySelector('.level-popover'); }
 function wireLevelPopovers(list){
   list.addEventListener('click', (e) => {
     const cell = e.target.closest('.sr-level');
@@ -181,6 +182,9 @@ const reviewModal = document.getElementById('reviewModal');
 const rvTitleEl = document.getElementById('rvTitle');
 const rvSubEl = document.getElementById('rvSub');
 const rvStatsEl = document.getElementById('rvStats');
+const rvHeadEl = reviewModal.querySelector('.rv-head');
+const rvLevelPopEl = document.getElementById('rvLevelPop');
+let reviewOpenedAt = 0;
 const REVIEW_SLOW_SHOW = 5;   // how many of the slowest right answers the review lists
 const rvBodyEl = document.getElementById('rvBody');
 
@@ -220,7 +224,10 @@ function openReview(s){
   const lv = sessionLevelInfo(s);
   const L = reviewLists(s.details);
   rvTitleEl.textContent = (historySkillLabels[s.skill] || s.skill) + (s.practice ? ' · Practice' : '');
-  rvSubEl.textContent = fmtDayLabel(s.date) + ', ' + fmtTimeLabel(s.date) + ' · ' + lv.label;
+  closeLevelPop(); rvLevelPopEl.classList.remove('show');
+  rvSubEl.innerHTML = fmtDayLabel(s.date) + ', ' + fmtTimeLabel(s.date) + ' · '
+    + (lv.range ? '<span class="sr-level rv-level"><span class="sr-level-txt">' + lv.label + '</span></span>' : lv.label);
+  rvLevelPopEl.innerHTML = lv.range ? levelPopoverInner(lv) : '';
   // second row: fixed columns, avg + accuracy coloured like the Recent sessions rows
   rvStatsEl.innerHTML = '<span class="rv-st rv-qs">' + (s.questions || '—') + ' Qs</span>'
     + '<span class="rv-st rv-avg">' + Number(s.avgTime).toFixed(1) + 's avg</span>'
@@ -235,14 +242,60 @@ function openReview(s){
   }
   rvBodyEl.innerHTML = html;
   rvBodyEl.scrollTop = 0;
+  reviewOpenedAt = Date.now();
   reviewModal.classList.add('show');
 }
-function closeReview(){ reviewModal.classList.remove('show'); }
+function closeReview(){ closeLevelPop(); rvLevelPopEl.classList.remove('show'); reviewModal.classList.remove('show'); }
 function reviewIsOpen(){ return reviewModal.classList.contains('show'); }
 
 // One delegated listener per session list (the lists re-render, so nothing is bound per row).
+const HOLD_DELAY_MS = 90;    // a finger must rest this long before the row starts floating
+let touchOpenedAt = 0;       // when a touch release last opened a review (the click that follows is then ignored)
+let lastPointerWasTouch = false;
+function wireRowHold(list){
+  let row = null, timer = 0, pid = null;
+  const release = () => {
+    clearTimeout(timer); timer = 0;
+    if(row) row.classList.remove('is-held');
+    row = null; pid = null;
+  };
+  list.addEventListener('pointerdown', (e) => {
+    lastPointerWasTouch = e.pointerType === 'touch';
+    if(!lastPointerWasTouch) return;                       // a mouse has real hover, handled in CSS
+    if(e.target.closest('.sr-level') || e.target.closest('.level-popover')) return;   // those open the level popover
+    const r = e.target.closest('.session-row.has-details');
+    if(!r) return;
+    release();
+    row = r; pid = e.pointerId;
+    timer = setTimeout(() => { if(row) row.classList.add('is-held'); }, HOLD_DELAY_MS);
+  });
+  list.addEventListener('pointermove', (e) => {
+    if(!row || e.pointerId !== pid) return;
+    const b = row.getBoundingClientRect();
+    const outside = e.clientX < b.left || e.clientX > b.right || e.clientY < b.top || e.clientY > b.bottom;
+    if(outside) release();   // the row keeps floating while the finger is anywhere on it; it stops once the finger leaves the row
+  });
+  // Once the row is floating, stop the page from scrolling under the finger (otherwise the browser takes the touch for
+  // scrolling and cancels the hold). Touches that start scrolling before the row floats are left alone.
+  list.addEventListener('touchmove', (e) => {
+    if(row && row.classList.contains('is-held') && e.cancelable) e.preventDefault();
+  }, { passive: false });
+  list.addEventListener('pointerup', (e) => {
+    if(!row || e.pointerId !== pid) return;
+    const r = row; release();
+    const s = findRound(Number(r.dataset.date), r.dataset.prac === '1');
+    if(s && s.details){ touchOpenedAt = Date.now(); openReview(s); }   // released on the same row = a tap
+  });
+  list.addEventListener('pointercancel', release);        // the browser took over for scrolling
+  // a long press must not pop up the phone's text-selection / context menu on these rows
+  list.addEventListener('contextmenu', (e) => {
+    if(lastPointerWasTouch && e.target.closest('.session-row.has-details')) e.preventDefault();
+  });
+}
 function wireRowReview(list){
+  wireRowHold(list);
   list.addEventListener('click', (e) => {
+    if(Date.now() - touchOpenedAt < 700) return;           // this tap was already handled on release
     if(e.target.closest('.sr-level') || e.target.closest('.level-popover')) return;   // those open the level popover instead
     const row = e.target.closest('.session-row.has-details');
     if(!row) return;
@@ -251,7 +304,9 @@ function wireRowReview(list){
   });
 }
 document.getElementById('btnReviewClose').addEventListener('click', closeReview);
-reviewModal.addEventListener('click', (e) => { if(e.target === reviewModal) closeReview(); });
+// (a tap that opened the popup can send a late click to the backdrop; ignore clicks in the first moments)
+reviewModal.addEventListener('click', (e) => { if(e.target === reviewModal && Date.now() - reviewOpenedAt > 400) closeReview(); });
+wireLevelPopovers(rvHeadEl);
 // Esc closes the review first (and stops there, so it can't also act as "go back a screen")
 window.addEventListener('keydown', (e) => {
   if(e.key === 'Escape' && reviewIsOpen()){

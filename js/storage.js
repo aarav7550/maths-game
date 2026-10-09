@@ -326,3 +326,40 @@ function shortcutHintSeen(){
 function markShortcutHintSeen(){
   try{ localStorage.setItem(SHORTCUT_HINT_KEY, '1'); }catch(e){}
 }
+
+// ---------- last played difficulty (per skill) ----------
+// Remembers which level you last STARTED a round with, per skill, so the
+// difficulty picker can open with it already selected.
+const LAST_LEVEL_KEY = 'numbers_game_last_level_v1';
+function loadLastLevels(){
+  try{
+    const raw = localStorage.getItem(LAST_LEVEL_KEY);
+    return raw ? JSON.parse(raw) : {};
+  }catch(e){ return {}; }
+}
+let lastLevels = loadLastLevels();
+function getLastLevel(skillKey){
+  return lastLevels[skillKey] || null;
+}
+function setLastLevel(skillKey, level){
+  lastLevels[skillKey] = level;
+  try{ localStorage.setItem(LAST_LEVEL_KEY, JSON.stringify(lastLevels)); }catch(e){}
+}
+
+// ---------- last played question count (per skill) ----------
+const LAST_COUNT_KEY = 'numbers_game_last_count_v1';
+function loadLastCounts(){
+  try{
+    const raw = localStorage.getItem(LAST_COUNT_KEY);
+    return raw ? JSON.parse(raw) : {};
+  }catch(e){ return {}; }
+}
+let lastCounts = loadLastCounts();
+function getLastCount(skillKey){
+  const n = lastCounts[skillKey];
+  return (Number.isInteger(n) && n > 0) ? n : null;
+}
+function setLastCount(skillKey, n){
+  lastCounts[skillKey] = n;
+  try{ localStorage.setItem(LAST_COUNT_KEY, JSON.stringify(lastCounts)); }catch(e){}
+}

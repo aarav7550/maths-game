@@ -455,11 +455,32 @@ function updateStartStrip(){
   applyQcountLimits();
 }
 
+// Show a given question count in the count bar (preset button if it matches, else the custom box).
+function setQcountUI(n){
+  const opts = [...qcountBar.querySelectorAll('.qcount-opt')];
+  opts.forEach(o => o.classList.remove('active','expanded'));
+  qcountBar.classList.remove('custom-active');
+  const preset = opts.find(o => o !== qcountCustomBtn && parseInt(o.dataset.n, 10) === n);
+  if(preset){
+    preset.classList.add('active');
+  } else {
+    qcountCustomBtn.classList.add('active', 'expanded');
+    qcountBar.classList.add('custom-active');
+    qcountInlineValue.value = n;
+  }
+  selectedQuestionCount = n;
+}
+
 function openDifficultyPicker(skillKey){
   CURRENT_SKILL = skillKey;
-  pickerLevel = null; // deliberate: opening never pre-selects a level
+  // Pre-select the level last played for this skill (if it still exists for this skill)
+  const savedLevel = getLastLevel(skillKey);
+  const savedIsValid = savedLevel && (savedLevel === 'custom'
+    ? !NO_CUSTOM[skillKey]
+    : DIFFICULTY_PRESETS[skillKey][savedLevel]);
+  pickerLevel = savedIsValid ? savedLevel : null;
   pickerCustom = Object.assign({}, skillConfig[skillKey]); // start custom editor from saved config
-  selectedQuestionCount = 15;
+  selectedQuestionCount = getLastCount(skillKey) || 15;
   practiceCheckbox.checked = false; // opening never pre-ticks it, so a normal round is the default
 
   diffModal.style.setProperty('--sc', SKILL_COLOR[skillKey]);
@@ -468,13 +489,10 @@ function openDifficultyPicker(skillKey){
   dmIcon.style.color = SKILL_COLOR[skillKey];
   dmSkillname.textContent = skillDisplayLabels[skillKey];
 
-  refreshCard();
-  updateStartStrip();
+  setQcountUI(selectedQuestionCount);
 
-  [...qcountBar.querySelectorAll('.qcount-opt')].forEach(o => o.classList.remove('active','expanded'));
-  qcountBar.classList.remove('custom-active');
-  qcountBar.querySelector('[data-n="15"]').classList.add('active');
-  applyQcountLimits();
+  refreshCard();
+  updateStartStrip(); // also runs applyQcountLimits()
 
   // The skill card you clicked still has keyboard focus under the popup; let go of it so
   // Enter means "start" and not "click that card again".
@@ -684,6 +702,10 @@ btnStartRound.addEventListener('click', () => {
     if(preset.mode) skillConfig[key].mode = preset.mode;
   }
   saveConfig();
+
+    saveConfig();
+  setLastLevel(key, pickerLevel);   // <-- new
+  setLastCount(key, selectedQuestionCount);   // <-- new
 
   state.skill = key;
   state.totalQuestions = selectedQuestionCount;
