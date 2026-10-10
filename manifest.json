@@ -1,6 +1,6 @@
 {
-  "name": "Foxy — Mental Math Drills",
-  "short_name": "Foxy",
+  "name": "Foxy Math — Mental Math Drills",
+  "short_name": "Foxy Math",
   "description": "Gamified mental math drills for CAT prep — get smart like a fox",
   "start_url": "./index.html",
   "scope": "./",

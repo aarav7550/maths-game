@@ -67,7 +67,7 @@
       list.sort(function (a, b) { return parseInt(a.sizes, 10) - parseInt(b.sizes, 10); });
       var pick = list.filter(function (i) { return parseInt(i.sizes, 10) >= 176; })[0] || list[list.length - 1];
       if (!pick) return fallback();
-      show(m.short_name || m.name || document.title, new URL(pick.src, new URL('manifest.json', location.href)).href);
+      show(m.name || m.short_name || document.title, new URL(pick.src, new URL('manifest.json', location.href)).href);
     }).catch(fallback);
   })();
 </script>

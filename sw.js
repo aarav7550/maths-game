@@ -1,6 +1,8 @@
 // Bump this version string whenever you deploy changes so devices notice a new version.
-const CACHE_VERSION = 'numbers-v62';
-const CACHE_NAME = `numbers-cache-${CACHE_VERSION}`;
+const CACHE_VERSION = 'foxy-v63';
+const CACHE_NAME = `foxy-cache-${CACHE_VERSION}`;
+// Caches from the old app name. Deleted on activate so devices don't keep the old copies.
+const OLD_CACHE_PREFIXES = ['numbers-cache-', 'foxy-cache-'];
 
 const ASSETS = [
   './',
@@ -51,7 +53,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key.startsWith('numbers-cache-') && key !== CACHE_NAME)
+          .filter((key) => OLD_CACHE_PREFIXES.some((p) => key.startsWith(p)) && key !== CACHE_NAME)
           .map((key) => caches.delete(key))
       )
     ).then(() => self.clients.claim())

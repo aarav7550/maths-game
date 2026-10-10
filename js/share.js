@@ -5,9 +5,9 @@
    1. A copy of the real results box (#card) is made, WITHOUT the buttons, and the
       app name + date/time are added at the bottom. It's built off-screen so the
       image looks the same on every device.
-   2. html2canvas turns that copy into an image (JPG).
+   2. html2canvas turns that copy into an image (PNG, see IMAGE_TYPE below).
    3. A popup shows the image with buttons:
-        phone   -> [Share] [Save to device]
+        phone   -> [Share] [Save to device] [copy icon]
         desktop -> [Copy]  [Download]
 
    NOTES
@@ -20,16 +20,24 @@
      (anything beyond that is left out and the section title says "first 10 of 50").
    - The popup is the static #shareModal in index.html (a normal .modal-overlay), so js/popups.js
      animates it like every other popup. This file only fills it and toggles .show.
-   - Copy needs a PNG (browsers can't copy JPGs to the clipboard), so only that one
-     action makes a PNG behind the scenes; everything else is JPG.
+   - Copy needs a PNG (browsers can't copy JPGs to the clipboard). While IMAGE_TYPE is PNG the same
+     file is used; if you switch to JPG, Copy quietly makes a PNG for itself.
    ========================================================================== */
 
 (function(){
   const CARD_W = 400;      // css px; captured at SCALE x => 1200px wide image
   const SCALE  = 3;
-  const JPG_QUALITY = 0.92;
+  // PNG, not JPG: this image is flat colours + small text, which JPG blurs (and PNG is the smaller file here too).
+  // To go back to JPG: IMAGE_TYPE = 'image/jpeg' and IMAGE_EXT = 'jpg'.
+  const IMAGE_TYPE  = 'image/png';
+  const IMAGE_EXT   = 'png';
+  const JPG_QUALITY = 0.95;   // only used when IMAGE_TYPE is 'image/jpeg'
+  // icons for the phone copy button (stroke colour is set in style.css)
+  const ICON_COPY  = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
+  const ICON_CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const ICON_CROSS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   const MAX_SLOWEST = 5;   // slowest questions shown in the image
-  const MAX_MISSED  = 10;  // wrong answers shown in the image
+  const MAX_MISSED  = 5;   // wrong answers shown in the image
 
   const C = { text:'#14171C', dim:'#6B7280', statBg:'#F6F9FA', line:'#E1EAEC',
               bad:'#C6544A', badBg:'#FBF0EF', badBd:'#F3D9D6', page:'#F3FAFB' };
@@ -143,7 +151,7 @@
     const img     = document.getElementById('shareModalImg');
     const actions = document.getElementById('shareModalActions');
     const xBtn    = document.getElementById('shareModalClose');
-    const url     = URL.createObjectURL(o.jpgBlob);
+    const url     = URL.createObjectURL(o.blob);
     const phone   = isPhone();
 
     img.src = url;
@@ -172,6 +180,29 @@
       document.body.appendChild(a); a.click(); a.remove();
       flash(b, 'Saved');
     }
+    // small icon-only button (phones: copy image). The icon briefly turns into a tick/cross as feedback.
+    function addIconBtn(svg, label, handler){
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'share-modal-iconbtn';
+      b.setAttribute('aria-label', label);
+      b.title = label;
+      b.innerHTML = svg;
+      b.addEventListener('click', () => handler(b));
+      actions.appendChild(b);
+      return b;
+    }
+    function flashIcon(b, svg){
+      b.innerHTML = svg;
+      setTimeout(() => { b.innerHTML = ICON_COPY; }, 1600);
+    }
+    function canCopy(){ return !!(navigator.clipboard && window.ClipboardItem); }
+    async function copyImage(){
+      // clipboard only accepts PNG: reuse the image if it already is one, otherwise make a PNG from the canvas
+      const png = o.blob.type === 'image/png' ? Promise.resolve(o.blob)
+                                              : new Promise(res => o.canvas.toBlob(res, 'image/png'));
+      await navigator.clipboard.write([ new ClipboardItem({ 'image/png': png }) ]);
+    }
 
     let firstBtn = null;
     if(phone){
@@ -186,15 +217,17 @@
       }
       const save = addBtn('Save to device', !firstBtn, download);
       firstBtn = firstBtn || save;
+      if(canCopy()){
+        addIconBtn(ICON_COPY, 'Copy image', async (b) => {
+          try{ await copyImage(); flashIcon(b, ICON_CHECK); }
+          catch(err){ console.error(err); flashIcon(b, ICON_CROSS); }
+        });
+      }
     } else {
-      if(navigator.clipboard && window.ClipboardItem){
+      if(canCopy()){
         firstBtn = addBtn('Copy', true, async (b) => {
-          try{
-            // clipboard only accepts PNG, so make one from the same canvas just for this
-            const png = new Promise(res => o.canvas.toBlob(res, 'image/png'));
-            await navigator.clipboard.write([ new ClipboardItem({ 'image/png': png }) ]);
-            flash(b, 'Copied!');
-          }catch(err){ console.error(err); flash(b, 'Couldn\u2019t copy'); }
+          try{ await copyImage(); flash(b, 'Copied!'); }
+          catch(err){ console.error(err); flash(b, 'Couldn\u2019t copy'); }
         });
       }
       const dl = addBtn('Download', !firstBtn, download);
@@ -236,12 +269,12 @@
       if(document.fonts && document.fonts.ready) await document.fonts.ready;   // so Sora/Inter are used, not fallbacks
 
       const canvas = await html2canvas(built.wrap, { scale: SCALE, backgroundColor: C.page, useCORS: true, logging: false });
-      const jpgBlob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', JPG_QUALITY));
-      if(!jpgBlob) throw new Error('could not create image');
+      const blob = await new Promise(res => canvas.toBlob(res, IMAGE_TYPE, JPG_QUALITY));
+      if(!blob) throw new Error('could not create image');
 
-      const fileName = slug(appName) + '-result.jpg';
-      const file = new File([jpgBlob], fileName, { type: 'image/jpeg' });
-      openPreview({ canvas: canvas, jpgBlob: jpgBlob, file: file, fileName: fileName,
+      const fileName = slug(appName) + '-result.' + IMAGE_EXT;
+      const file = new File([blob], fileName, { type: IMAGE_TYPE });
+      openPreview({ canvas: canvas, blob: blob, file: file, fileName: fileName,
                     appName: appName, accent: built.accent, accentText: built.accentText });
       btn.textContent = original;
     }catch(err){

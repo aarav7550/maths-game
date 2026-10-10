@@ -767,17 +767,18 @@
   #view-results .btn-primary:hover{ opacity:1; }
 
   /* Results action buttons: row 1 = Home / Challenge friends / Share, row 2 = Go again (full width, bigger) */
-  #view-results .actions .btn{ min-width:0; white-space:nowrap; }
+  #view-results .actions .btn{ min-width:0; white-space:nowrap; font-size:14.5px; }
   #view-results #btnShareSet{ flex:1.7; }
-  #view-results #btnAgain{ flex:1 0 100%; font-size:16px; padding:17px; border-radius:13px; margin-top:4px; }
+  #view-results #btnAgain{ flex:1 0 100%; font-size:17px; padding:17px; border-radius:13px; margin-top:4px; }
 
   @media (max-width:480px){
     #view-results{ padding:16px; }
     #view-results .page{ margin-top:20px; }
     #view-results .page-head{ margin-bottom:18px; }
     #view-results .card{ padding:18px; }
-    #view-results .actions .btn{ font-size:12.5px; padding:13px 4px; white-space:normal; line-height:1.2; }
-    #view-results #btnAgain{ font-size:15.5px; padding:16px; }
+    #view-results .actions .btn{ font-size:14px; padding:14px 4px; white-space:normal; line-height:1.2; }
+    #view-results #btnShareSet{ flex:2.2; }
+    #view-results #btnAgain{ font-size:16.5px; padding:17px; }
   }
 
   /* ---------- HISTORY view (Step 4a: Overview only) ---------- */
@@ -1851,6 +1852,12 @@
 .share-modal-btn:hover{ background:var(--line-soft); }
 .share-modal-btn.primary{ border:none; font-weight:700; background:var(--share-accent,#007EA7); color:var(--share-accent-text,#FFFFFF); }
 .share-modal-btn.primary:hover{ background:var(--share-accent,#007EA7); opacity:0.92; }
+.share-modal-iconbtn{
+  flex:0 0 48px; display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer;
+  border-radius:11px; background:none; border:1px solid var(--line); box-shadow:none;
+}
+.share-modal-iconbtn:hover{ background:var(--line-soft); }
+.share-modal-iconbtn svg{ width:19px; height:19px; fill:none; stroke:var(--ink); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 
 @media (min-width:641px){
   .share-modal-box{ max-width:440px; }

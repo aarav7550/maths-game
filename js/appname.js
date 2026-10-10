@@ -1,7 +1,7 @@
 /* ==========================================================================
    appname.js — the app's name lives in ONE place: manifest.json.
 
-   - window.getAppName()  -> Promise of the name (short_name, then name). share.js uses it.
+   - window.getAppName()  -> Promise of the name ("name" from the manifest, then short_name as a backup). share.js uses it.
    - Any element with a  data-app-name  attribute gets its text replaced by the name
      (Home top bar, About page title, ...). To show the name somewhere new, just add
      the attribute:  <div data-app-name>fallback text</div>
@@ -23,7 +23,7 @@
       const link = document.querySelector('link[rel="manifest"]');
       promise = fetch(link ? link.href : 'manifest.json')
         .then(r => r.json())
-        .then(m => m.short_name || m.name || fromTitle())
+        .then(m => m.name || m.short_name || fromTitle())
         .catch(() => fromTitle());
     }
     return promise;
