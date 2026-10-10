@@ -27,7 +27,7 @@
 (function(){
   const CARD_W = 400;      // css px; captured at SCALE x => 1200px wide image
   const SCALE  = 3;
-  // PNG, not JPG: this image is flat colours + small text, which JPG blurs (and PNG is the smaller file here too).
+  // PNG, not JPG: flat colours + small text (JPG blurs them), and PNG keeps transparent corners. Don't switch to JPG without losing the rounded corners.
   // To go back to JPG: IMAGE_TYPE = 'image/jpeg' and IMAGE_EXT = 'jpg'.
   const IMAGE_TYPE  = 'image/png';
   const IMAGE_EXT   = 'png';
@@ -136,7 +136,7 @@
 
     const wrap = document.createElement('div');
     wrap.style.cssText = 'position:fixed;left:-10000px;top:0;width:' + CARD_W + 'px;box-sizing:border-box;' +
-                         'padding:16px;background:' + C.page + ';font-family:Inter,sans-serif;color:' + C.text + ';';
+                         'padding:16px;background:transparent;font-family:Inter,sans-serif;color:' + C.text + ';';   // transparent margin so the rounded corners show the background, not a square
     wrap.appendChild(box);
     return { wrap: wrap, accent: accent, accentText: (cs.getPropertyValue('--r-accent-text').trim() || '#FFFFFF') };
   }
@@ -268,7 +268,7 @@
       document.body.appendChild(built.wrap);
       if(document.fonts && document.fonts.ready) await document.fonts.ready;   // so Sora/Inter are used, not fallbacks
 
-      const canvas = await html2canvas(built.wrap, { scale: SCALE, backgroundColor: C.page, useCORS: true, logging: false });
+      const canvas = await html2canvas(built.wrap, { scale: SCALE, backgroundColor: null, useCORS: true, logging: false });   // null = transparent outside the rounded card (PNG keeps this)
       const blob = await new Promise(res => canvas.toBlob(res, IMAGE_TYPE, JPG_QUALITY));
       if(!blob) throw new Error('could not create image');
 

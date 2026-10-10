@@ -14,6 +14,14 @@ const FULL_PAGE_SIZE = 15;
 // ---------- small helpers ----------
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+// A round can be opened (and so shared) only if it has question details AND a saved best time.
+// Older rounds without a best time show no popup and no share button.
+function isReviewable(s){
+  const d = s.details;
+  const hasDetailLists = !!(d && (Array.isArray(d.all) || (Array.isArray(d.wrong) && Array.isArray(d.slow))));
+  return hasDetailLists && typeof s.bestTime === 'number' && isFinite(s.bestTime);
+}
+
 function startOfDayMs(ts){
   const d = new Date(ts);
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -83,9 +91,8 @@ function sessionRowHtml(s, withSkill){
     + '<div class="sr-cell sr-avg">' + s.avgTime.toFixed(1) + 's avg</div>'
     + '<div class="sr-cell sr-acc">' + s.accuracy + '% acc</div>'
     + '</div>';
-  // Rounds saved with question details can be tapped to review them (see "SESSION REVIEW" below)
-  const d = s.details;
-  const hasDetails = !!(d && (Array.isArray(d.all) || (Array.isArray(d.wrong) && Array.isArray(d.slow))));
+  // Rounds that can be tapped to review them (see "SESSION REVIEW" below): see isReviewable()
+  const hasDetails = isReviewable(s);
   return '<div class="session-row' + (s.practice ? ' is-practice' : '') + (hasDetails ? ' has-details' : '') + '"'
     + (hasDetails ? ' data-date="' + s.date + '" data-prac="' + (s.practice ? 1 : 0) + '"' : '') + '>'
     + line1 + line2 + popover + '</div>';
@@ -284,7 +291,7 @@ function wireRowHold(list){
     if(!row || e.pointerId !== pid) return;
     const r = row; release();
     const s = findRound(Number(r.dataset.date), r.dataset.prac === '1');
-    if(s && s.details){ touchOpenedAt = Date.now(); openReview(s); }   // released on the same row = a tap
+    if(s && isReviewable(s)){ touchOpenedAt = Date.now(); openReview(s); }   // released on the same row = a tap
   });
   list.addEventListener('pointercancel', release);        // the browser took over for scrolling
   // a long press must not pop up the phone's text-selection / context menu on these rows
@@ -300,7 +307,7 @@ function wireRowReview(list){
     const row = e.target.closest('.session-row.has-details');
     if(!row) return;
     const s = findRound(Number(row.dataset.date), row.dataset.prac === '1');
-    if(s && s.details) openReview(s);
+    if(s && isReviewable(s)) openReview(s);
   });
 }
 document.getElementById('btnReviewClose').addEventListener('click', closeReview);
