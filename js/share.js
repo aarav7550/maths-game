@@ -3,7 +3,8 @@
 
    What happens when you tap Share:
    1. A copy of the real results box (#card) is made, WITHOUT the buttons, and the
-      app name + date/time are added at the bottom. It's built off-screen so the
+      app name + date/time are added at the bottom. (From History, the same box is built from a saved
+      round instead: window.shareSession(round, button).) It's built off-screen so the
       image looks the same on every device.
    2. html2canvas turns that copy into an image (PNG, see IMAGE_TYPE below).
    3. A popup shows the image with buttons:
@@ -27,7 +28,7 @@
 (function(){
   const CARD_W = 400;      // css px; captured at SCALE x => 1200px wide image
   const SCALE  = 3;
-  // PNG, not JPG: flat colours + small text (JPG blurs them), and PNG keeps transparent corners. Don't switch to JPG without losing the rounded corners.
+  // PNG, not JPG: this image is flat colours + small text, which JPG blurs (and PNG is the smaller file here too).
   // To go back to JPG: IMAGE_TYPE = 'image/jpeg' and IMAGE_EXT = 'jpg'.
   const IMAGE_TYPE  = 'image/png';
   const IMAGE_EXT   = 'png';
@@ -54,6 +55,7 @@
     const k = pct / 100;
     return 'rgb(' + rgb.map(v => Math.round(v * k + 255 * (1 - k))).join(',') + ')';
   }
+  function esc(v){ return String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function slug(s){ return String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'result'; }
   function isPhone(){ return window.matchMedia && window.matchMedia('(pointer:coarse)').matches; }
 
@@ -91,18 +93,83 @@
     ];
   }
 
-  function buildCard(appName){
-    const view   = document.getElementById('view-results');
-    const cs     = getComputedStyle(view);
-    const accHex = cs.getPropertyValue('--r-accent').trim();
-    const rgb    = hexToRgb(accHex) || [0,126,167];
+  // Where the card's content comes from:
+  //  - the live Results screen (a copy of #card), or
+  //  - a saved round from History (built from the saved record, same classes so the same styles apply).
+  function sourceFromResults(){
+    const view = document.getElementById('view-results');
+    const cs   = getComputedStyle(view);
+    const box  = document.getElementById('card').cloneNode(true);
+    box.querySelectorAll('.actions').forEach(n => n.remove());
+    return { box: box, accentHex: cs.getPropertyValue('--r-accent').trim(),
+             accentText: cs.getPropertyValue('--r-accent-text').trim() || '#FFFFFF', when: new Date() };
+  }
+
+  function sourceFromSession(rec){
+    const labels  = (typeof skillDisplayLabels !== 'undefined') ? skillDisplayLabels : {};
+    const isMixed = rec.skill === 'mixed';
+    const tag = k => (isMixed && k) ? '<span class="dr-skilltag">' + esc(labels[k] || k) + '</span>' : '';
+
+    // config note (same wording as the Results screen)
+    const parts = ['<b>' + esc(rec.questions || '—') + ' questions</b>' + (rec.practice ? ' · practice mode' : '') + (rec.fromChallenge ? ' · from a challenge code' : '')];
+    try{
+      if(rec.config && rec.config.cfg && typeof describeSkillConfig === 'function'){
+        if(isMixed){
+          const inc = rec.config.included || Object.keys(rec.config.cfg);
+          parts.push('Mix: ' + inc.map(k => labels[k] || k).join(', '));
+          inc.forEach(k => { if(rec.config.cfg[k]) parts.push(describeSkillConfig(k, rec.config.cfg[k])); });
+        } else {
+          parts.push(describeSkillConfig(rec.skill, rec.config.cfg));
+        }
+      }
+    }catch(e){ console.error(e); }
+
+    // saved lists (some old test rounds saved every question as details.all)
+    const d = rec.details || {};
+    let wrong, slow;
+    if(Array.isArray(d.all)){
+      wrong = d.all.filter(r => !r.c);
+      slow  = d.all.filter(r => r.c).sort((x, y) => y.t - x.t);
+    } else { wrong = d.wrong || []; slow = d.slow || []; }
+
+    const num   = v => (typeof v === 'number' && isFinite(v)) ? v.toFixed(1) + 's' : '—';   // best time may be missing -> dash
+    const title = rec.accuracy === 100 ? 'Flawless round' : (rec.accuracy >= 80 ? 'Solid round' : 'Round complete');   // same rule as game.js
+
+    let html =
+      '<div class="title">' + title + '</div>' +
+      '<div class="config-note">' + parts.join('<br>') + '</div>' +
+      '<div class="stats-grid">' +
+        '<div class="stat-box s-acc"><div class="num">' + esc(rec.accuracy) + '%</div><div class="lbl">accuracy</div></div>' +
+        '<div class="stat-box s-avg"><div class="num">' + num(Number(rec.avgTime)) + '</div><div class="lbl">avg time</div></div>' +
+        '<div class="stat-box s-best"><div class="num">' + num(rec.bestTime) + '</div><div class="lbl">best time</div></div>' +
+      '</div>';
+    if(slow.length){
+      html += '<div class="section"><div class="section-title">Slowest right answers</div><div class="detail-list">' +
+        slow.map(r => '<div class="detail-row"><span class="dr-problem">' + esc(r.q) + tag(r.k) + '</span><span class="dr-time">' + (r.t / 1000).toFixed(1) + 's</span></div>').join('') +
+        '</div></div>';
+    }
+    if(wrong.length){
+      html += '<div class="section"><div class="section-title">Missed</div><div class="detail-list">' +
+        wrong.map(r => '<div class="miss-row"><span class="dr-problem">' + esc(r.q) + tag(r.k) + '</span><span class="miss-nums"><span class="you">you: ' +
+          (r.g === null ? 'no answer' : esc(r.g)) + '</span><span class="correct">right: ' + esc(r.a) + '</span></span></div>').join('') +
+        '</div></div>';
+    }
+
+    const box = document.createElement('div');
+    box.innerHTML = html;
+    const accentHex = rec.skill === 'mixed' ? '#007EA7' : ((typeof SKILL_COLOR !== 'undefined' && SKILL_COLOR[rec.skill]) || '#007EA7');
+    return { box: box, accentHex: accentHex, accentText: '#FFFFFF', when: new Date(rec.date) };   // footer shows when the round was played
+  }
+
+  function buildCard(appName, src){
+    src = src || sourceFromResults();
+    const rgb    = hexToRgb(src.accentHex) || [0,126,167];
     const accent = 'rgb(' + rgb.join(',') + ')';
     const tintBg = tint(rgb, 12);
     const tintBd = tint(rgb, 32);
 
-    // copy of the live results box, minus the buttons and minus ids (so nothing clashes with the real page)
-    const box = document.getElementById('card').cloneNode(true);
-    box.querySelectorAll('.actions').forEach(n => n.remove());
+    // minus ids, so nothing clashes with the real page
+    const box = src.box;
     box.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
     box.removeAttribute('id');
 
@@ -120,9 +187,8 @@
     });
 
     // footer: app name (left) + date/time (right)
-    const now  = new Date();
-    const when = now.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' }) +
-                 ' · ' + now.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+    const when = src.when.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' }) +
+                 ' · ' + src.when.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
     const foot = document.createElement('div');
     foot.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid ' + C.line + ';padding-top:12px;';
     const left = document.createElement('span');
@@ -134,11 +200,12 @@
     foot.appendChild(left); foot.appendChild(right);
     box.appendChild(foot);
 
+    // solid page-coloured margin around the rounded card (a transparent one showed black in some apps, and WhatsApp offered "sticker")
     const wrap = document.createElement('div');
     wrap.style.cssText = 'position:fixed;left:-10000px;top:0;width:' + CARD_W + 'px;box-sizing:border-box;' +
-                         'padding:16px;background:transparent;font-family:Inter,sans-serif;color:' + C.text + ';';   // transparent margin so the rounded corners show the background, not a square
+                         'padding:16px;background:' + C.page + ';font-family:Inter,sans-serif;color:' + C.text + ';';
     wrap.appendChild(box);
-    return { wrap: wrap, accent: accent, accentText: (cs.getPropertyValue('--r-accent-text').trim() || '#FFFFFF') };
+    return { wrap: wrap, accent: accent, accentText: src.accentText };
   }
 
   // ---------- the popup (static #shareModal in index.html; js/popups.js animates .show on/off) ----------
@@ -255,20 +322,23 @@
   }
 
   // ---------- main ----------
-  async function makeAndPreview(btn){
-    const original = btn.textContent;
+  // btn: the button that was tapped. src: where the card content comes from (omit = live Results screen).
+  // Text buttons (Results "Share") change their label while working; icon buttons get is-busy / is-failed instead.
+  async function makeAndPreview(btn, src){
+    const textBtn  = !btn.querySelector('svg');
+    const original = textBtn ? btn.textContent : '';
     btn.disabled = true;
-    btn.textContent = 'Preparing…';
+    if(textBtn) btn.textContent = 'Preparing…'; else btn.classList.add('is-busy');
     let built = null;
 
     try{
       if(typeof html2canvas !== 'function') throw new Error('html2canvas not loaded');
       const appName = await getAppName();
-      built = buildCard(appName);
+      built = buildCard(appName, src);
       document.body.appendChild(built.wrap);
       if(document.fonts && document.fonts.ready) await document.fonts.ready;   // so Sora/Inter are used, not fallbacks
 
-      const canvas = await html2canvas(built.wrap, { scale: SCALE, backgroundColor: null, useCORS: true, logging: false });   // null = transparent outside the rounded card (PNG keeps this)
+      const canvas = await html2canvas(built.wrap, { scale: SCALE, backgroundColor: C.page, useCORS: true, logging: false });
       const blob = await new Promise(res => canvas.toBlob(res, IMAGE_TYPE, JPG_QUALITY));
       if(!blob) throw new Error('could not create image');
 
@@ -276,16 +346,25 @@
       const file = new File([blob], fileName, { type: IMAGE_TYPE });
       openPreview({ canvas: canvas, blob: blob, file: file, fileName: fileName,
                     appName: appName, accent: built.accent, accentText: built.accentText });
-      btn.textContent = original;
+      if(textBtn) btn.textContent = original;
     }catch(err){
       console.error('Share failed:', err);
-      btn.textContent = 'Couldn\u2019t share';
-      setTimeout(() => { btn.textContent = original; }, 2000);
+      if(textBtn){
+        btn.textContent = 'Couldn\u2019t share';
+        setTimeout(() => { btn.textContent = original; }, 2000);
+      } else {
+        btn.classList.add('is-failed');
+        setTimeout(() => btn.classList.remove('is-failed'), 2000);
+      }
     }finally{
       if(built) built.wrap.remove();
+      btn.classList.remove('is-busy');
       btn.disabled = false;
     }
   }
+
+  // History: share a saved round (called from the review popup's share icon in history.js)
+  window.shareSession = function(rec, btn){ return makeAndPreview(btn, sourceFromSession(rec)); };
 
   document.addEventListener('click', function(e){
     const btn = e.target.closest('#btnShareImage');
