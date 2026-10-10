@@ -97,7 +97,7 @@
   // ---------- per-skill settings cards ----------
   function buildConfigCard(skillId){
     const c = config[skillId];
-    const isAdd = skillId === 'add';
+    const isAdd = SKILL_HAS_COUNT[skillId];   // skills with a "how many numbers" setting (Additions, Subtraction)
     const isCustom = c.level === 'custom';
     const val = (v) => (v === null || v === undefined || Number.isNaN(v)) ? '' : v;
 
@@ -441,7 +441,7 @@
   // (a shared challenge must not depend on the creator's personal saved settings).
   function resolveConfig(skillId){
     const c = config[skillId];
-    const isAdd = skillId === 'add';
+    const isAdd = SKILL_HAS_COUNT[skillId];
     if(c.level === 'custom'){
       const out = { min: c.custom.min, max: c.custom.max, parity: isAdd ? 'any' : c.custom.parity };
       if(isAdd) out.count = c.custom.count || 2;

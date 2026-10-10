@@ -87,11 +87,57 @@ document.getElementById('btnDecimalHintOk').addEventListener('click', () => clos
 // Esc / system Back on the hint (nav.js): counts as seen, but doesn't start a timed round by accident.
 window.dismissDecimalHint = () => closeDecimalHint(false);
 
+// ---------- one-time sign hint (iPhone/iPad and desktop; Android has none) ----------
+// Shown once per device, the first time a round includes a skill that can have negative answers
+// (`canBeNegative: true` in skills.js). IS_IOS / IS_DESKTOP are defined further down, in the input section.
+//   iPhone/iPad: the sign is ignored, so there is nothing to type.
+//   desktop:     explains that = takes a mistaken minus off the answer.
+const SIGN_HINT_TEXT = {
+  ios: {
+    title: "Don't worry about the sign",
+    text: 'Some answers are negative. The iPhone number pad has no minus key, so just type the number without it.',
+    eq: '12 &minus; 30 = <b>&minus;18</b>',
+    how: 'Just type <b>18</b>.'
+  },
+  desktop: {
+    title: 'Press = or + for a positive answer',
+    text: 'Some answers are negative. Type the minus (<span class="kbd">-</span>) whenever you like and it moves to the front. Added one by mistake? Press <span class="kbd">=</span> or <span class="kbd">+</span> to take it off. No Shift needed.',
+    eq: '30 &minus; 12 = <b>18</b>',
+    how: 'Typed <b>&minus;18</b> by mistake? Press <span class="kbd">=</span> or <span class="kbd">+</span> and it becomes <b>18</b>.'
+  }
+};
+function showSignHint(){
+  const t = SIGN_HINT_TEXT[IS_IOS ? 'ios' : 'desktop'];
+  document.getElementById('sgTitle').textContent = t.title;
+  document.getElementById('sgText').innerHTML = t.text;
+  document.getElementById('sgEq').innerHTML = t.eq;
+  document.getElementById('sgHow').innerHTML = t.how;
+  signHintModal.classList.add('show');
+}
+const SIGN_HINT_KEY = 'numbers_signHintSeen';
+const signHintModal = document.getElementById('signHintModal');
+let signHintShownThisSession = false;   // backup in case localStorage is blocked
+function signHintNeeded(){
+  if(!(IS_IOS || IS_DESKTOP) || signHintShownThisSession) return false;
+  try { if(localStorage.getItem(SIGN_HINT_KEY) === '1') return false; } catch(e){}
+  return roundSkillKeys().some(k => SKILLS[k] && SKILLS[k].canBeNegative);
+}
+function closeSignHint(thenStart){
+  signHintShownThisSession = true;
+  try { localStorage.setItem(SIGN_HINT_KEY, '1'); } catch(e){}
+  signHintModal.classList.remove('show');
+  if(thenStart) startRound();   // the round that was waiting for the hint starts now
+}
+document.getElementById('btnSignHintOk').addEventListener('click', () => closeSignHint(true));
+window.dismissSignHint = () => closeSignHint(false);
+
 // ---------- round logic ----------
 function startRound(){
   // First time on a skill with decimal answers: show the hint first, round starts after "Got it".
   const hintSkills = unseenDecimalSkills();
   if(hintSkills.length){ showDecimalHint(hintSkills); return; }
+  // iPhone/iPad and desktop, first time on a skill with negative answers: explain how the sign works there.
+  if(signHintNeeded()){ showSignHint(); return; }
 
   state.currentIndex = 0;
   state.correctCount = 0;
@@ -154,7 +200,8 @@ function pickSkillKey(){
 // A problem may accept several answers (e.g. 16.66 or 16.67): problem.answers lists them all.
 function matchesAnswer(problem, value){
   const list = problem.answers || [problem.answer];
-  return list.some(a => value === a);
+  // iPhone/iPad: the number pad has no minus key, so a negative answer is also accepted without its sign
+  return list.some(a => value === a || (IS_IOS && a < 0 && value === -a));
 }
 
 function nextQuestion(){
@@ -175,6 +222,8 @@ function nextQuestion(){
     difficultyPill.textContent = difficultyLabels[matchingDifficultyForConfig(skillKey, activeConfig(skillKey))];
   }
   answerInput.value = '';
+  prevAnswerValue = '';
+  dotGuard = false;
   answerInput.classList.remove('flash-good','flash-bad');
   problemText.classList.remove('shake');
   correctReveal.classList.remove('show');
@@ -204,8 +253,31 @@ function runTimerBar(){
 }
 
 // ---------- live-checking input ----------
+// iPhone/iPad number pads have no minus key, so there the sign of a negative answer is not checked
+// (for -18 the player types 18). Everywhere else the sign is part of the answer.
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// Desktop = a real keyboard and mouse (not a phone/tablet). Only there, = works as the plus key (see below).
+const IS_DESKTOP = !IS_IOS && !/Android/i.test(navigator.userAgent) && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+// True when `raw` is exactly the whole-number part of the answer (with its minus sign, except on iPhone/iPad
+// where the sign is never typed). This is the moment the decimal point gets added for the player.
+function wholePartMatches(raw, answer){
+  if(!/^-?\d+$/.test(raw)) return false;
+  const wantsMinus = answer < 0 && !IS_IOS;
+  if(raw.startsWith('-') !== wantsMinus) return false;
+  return Math.abs(Number(raw)) === Math.abs(Math.trunc(answer));
+}
+
+let prevAnswerValue = '';   // what the box held before the latest keystroke
+let dotGuard = false;       // true once a backspace on the auto-added point has been swallowed
+
 answerInput.addEventListener('input', (e) => {
   if(!state.running || state.awaitingAdvance) return;
+  handleAnswerInput(e);
+  prevAnswerValue = answerInput.value;
+});
+
+function handleAnswerInput(e){
   let raw = answerInput.value.trim();
   // Only one decimal point allowed: if a second one is typed (e.g. after the auto-added one),
   // drop it and keep the first.
@@ -214,19 +286,56 @@ answerInput.addEventListener('input', (e) => {
     raw = raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/\./g, '');
     answerInput.value = raw;
   }
+  // The minus sign can be typed anywhere (before, in the middle or after the digits): it always ends up at the very
+  // front, and only one is kept. Done first, so everything below (matching, auto-decimal) sees the fixed answer.
+  if(raw.indexOf('-') !== -1){
+    const fixed = '-' + raw.replace(/-/g, '');
+    if(fixed !== raw){ raw = fixed; answerInput.value = raw; }
+  }
+  const deleting = e && e.inputType && e.inputType.indexOf('delete') === 0;
+  const answer = state.currentProblem.answer;
+
+  // Backspace on the auto-added point is protected so it can't be wiped out in a hurry:
+  //   1st backspace: nothing happens (the point is put straight back)
+  //   2nd backspace: the digit before the point goes, and the point goes with it (those digits no longer
+  //                  match the answer's whole part); typing the right digits again brings the point back.
+  if(deleting && !Number.isInteger(answer) && prevAnswerValue === raw + '.' && wholePartMatches(raw, answer)){
+    if(!dotGuard){
+      dotGuard = true;
+      answerInput.value = raw + '.';
+    } else {
+      dotGuard = false;
+      answerInput.value = raw.slice(0, -1);
+    }
+    return;
+  }
+  dotGuard = false;
+
   if(raw === '' || raw === '-') return;
   const value = Number(raw);
-  const answer = state.currentProblem.answer;
   if(!Number.isNaN(value) && matchesAnswer(state.currentProblem, value)){
     lockInAnswer(value);
     return;
   }
-  // Auto-decimal (iPhone numpads have no "."): if the answer has decimals and the whole
-  // number typed so far is exactly the answer's whole-number part, add the point for them.
+  // Auto-decimal (iPhone numpads have no "."): if the answer has decimals and what's typed so far is exactly
+  // the answer's whole-number part, add the point for them.
   // Skipped while deleting, otherwise the player could never backspace over the point.
-  const deleting = e && e.inputType && e.inputType.indexOf('delete') === 0;
-  if(!deleting && !Number.isInteger(answer) && /^\d+$/.test(raw) && value === Math.trunc(answer)){
+  if(!deleting && !Number.isInteger(answer) && wholePartMatches(raw, answer)){
     answerInput.value = raw + '.';
+  }
+}
+
+// Desktop: = is the + key without Shift. Pressing it (or +) takes the minus sign off the answer, so a minus typed
+// by mistake is fixed in one key. Pressing it with no minus there does nothing (the = is never typed into the box).
+answerInput.addEventListener('keydown', (e) => {
+  if(!IS_DESKTOP || (e.key !== '=' && e.key !== '+')) return;
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  e.preventDefault();
+  if(!state.running || state.awaitingAdvance) return;
+  if(answerInput.value.startsWith('-')){
+    answerInput.value = answerInput.value.slice(1);
+    handleAnswerInput({ inputType: 'insertText' });   // re-check: it may match now, or the point may need adding
+    prevAnswerValue = answerInput.value;
   }
 });
 
@@ -437,7 +546,7 @@ const difficultyLabels = { veryeasy:'Very Easy', easy:'Easy', difficult:'Difficu
 
 function describeSkillConfig(key, cfg){
   const diff = difficultyLabels[matchingDifficultyForConfig(key, cfg)];
-  if(key === 'add'){
+  if(SKILL_HAS_COUNT[key]){
     return `${skillDisplayLabels[key]}: ${diff} (${cfg.min}–${cfg.max}, ${cfg.count || 2} numbers, ${cfg.parity})`;
   }
   if(SKILL_META[key].modeText){

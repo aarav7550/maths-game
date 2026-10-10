@@ -287,7 +287,7 @@ const qcountInlineValue = document.getElementById('qcountInlineValue');
 function presetLabel(skillKey, level){
   const p = DIFFICULTY_PRESETS[skillKey][level];
   if(p.label) return p.label;
-  if(skillKey === 'add') return `${p.min}–${p.max}, ${p.count} numbers`;
+  if(SKILL_HAS_COUNT[skillKey]) return `${p.min}–${p.max}, ${p.count} numbers`;
   return `${p.min}–${p.max}`;
 }
 // Real presets carry no explanatory note text (that was mockup-only flavor) — build a
@@ -295,12 +295,12 @@ function presetLabel(skillKey, level){
 function presetNote(skillKey, level){
   const p = DIFFICULTY_PRESETS[skillKey][level];
   if(p.note) return p.note;
-  if(skillKey === 'add') return `Add <b>${p.count} numbers</b> from ${p.min}–${p.max}.`;
+  if(SKILL_HAS_COUNT[skillKey]) return `${SKILL_META[skillKey].countVerb || 'Add'} <b>${p.count} numbers</b> from ${p.min}–${p.max}.`;
   return `Numbers from <b>${p.min}–${p.max}</b>.`;
 }
 
 function buildConfigCard(skillKey){
-  const isAdd = skillKey === 'add';
+  const isAdd = SKILL_HAS_COUNT[skillKey];   // skills with a "how many numbers" setting (Additions, Subtraction)
   const isCustom = pickerLevel === 'custom';
 
   const pillHtml = (level) => `
@@ -698,7 +698,7 @@ btnStartRound.addEventListener('click', () => {
     const preset = DIFFICULTY_PRESETS[key][pickerLevel];
     skillConfig[key].min = preset.min;
     skillConfig[key].max = preset.max;
-    if(key === 'add' && preset.count) skillConfig[key].count = preset.count;
+    if(SKILL_HAS_COUNT[key] && preset.count) skillConfig[key].count = preset.count;
     if(preset.mode) skillConfig[key].mode = preset.mode;
   }
   saveConfig();
@@ -723,7 +723,7 @@ function matchingDifficultyForConfig(key, cfg){
   if(!presets || !cfg) return 'custom';
   const matches = (preset) => {
     if(cfg.min !== preset.min || cfg.max !== preset.max) return false;
-    if(key === 'add' && (cfg.count || 2) !== (preset.count || 2)) return false;
+    if(SKILL_HAS_COUNT[key] && (cfg.count || 2) !== (preset.count || 2)) return false;
     if(preset.mode && (cfg.mode || 'fwd') !== preset.mode) return false;
     return true;
   };

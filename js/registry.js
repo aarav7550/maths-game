@@ -21,6 +21,8 @@
 //   pool                optional (lo, hi, parity) => how many different questions the range can give
 //   modeLabel/modeText  optional: name + text of a special setting (e.g. Reciprocals' direction) shown on History / Challenge Details
 //   hint                optional example for the one-time "no need to type the decimal point" popup
+//   countVerb           optional: for skills with a `count` default (Additions, Subtraction) - the word used in the level notes
+//   altKeys             optional: extra keyboard-shortcut keys for this skill, on top of its letter (e.g. ['=', '+'])
 // ============================================================
 
 const SKILL_GROUP_DEFS = [
@@ -73,9 +75,27 @@ const SKILL_META = {
       difficult: { min: 1, max: 999, count: 3, secs: 25, decimalPct: 30 },
       verydifficult: { min: 1, max: 9999, count: 4, secs: 30, decimalPct: 40 }
     },
+    countVerb: 'Add',
+    altKeys: ['=', '+'],   // = is the + key without Shift
     customNote: 'Pick your own min/max and how many numbers to add.',
     pool: () => Infinity,
     hint: { q: '12.5 + 3.7', a: '16.2', whole: '16', rest: '2' }
+  },
+  sub: {
+    label: 'Subtraction', icon: '\u2212', desc: 'Take numbers away', color: '#7C7F65', group: 'arith',
+    // same levels and timers as Additions. Answers can be negative (nothing forces or limits that).
+    defaults: { min: 1, max: 99, count: 2, parity: 'any' },
+    presets: {
+      veryeasy: { min: 1, max: 99, count: 2, secs: 9 },
+      easy: { min: 1, max: 999, count: 2, secs: 15, decimalPct: 20 },
+      difficult: { min: 1, max: 999, count: 3, secs: 25, decimalPct: 30 },
+      verydifficult: { min: 1, max: 9999, count: 4, secs: 30, decimalPct: 40 }
+    },
+    countVerb: 'Subtract',
+    altKeys: ['-'],
+    customNote: 'Pick your own min/max and how many numbers to subtract.',
+    pool: () => Infinity,
+    hint: { q: '12.5 \u2212 3.7', a: '8.8', whole: '8', rest: '8' }
   },
   sq: {
     label: 'Square', icon: 'x²', desc: 'Square the number', color: '#C6473A', group: 'powers',
@@ -129,7 +149,7 @@ const SKILL_META = {
 const SKILL_ORDER = Object.keys(SKILL_META);
 const DIFF_ORDER = ['veryeasy', 'easy', 'difficult', 'verydifficult'];   // order levels appear in the picker
 
-const skillDisplayLabels = {}, SKILL_ICON = {}, SKILL_DESC = {}, SKILL_COLOR = {}, SKILL_CLASS = {}, SKILL_KEY = {};
+const skillDisplayLabels = {}, SKILL_ICON = {}, SKILL_DESC = {}, SKILL_COLOR = {}, SKILL_CLASS = {}, SKILL_KEY = {}, SKILL_KEYS = {}, SKILL_HAS_COUNT = {};
 const DIFFICULTY_PRESETS = {}, CUSTOM_NOTE = {}, NO_CUSTOM = {};
 SKILL_ORDER.forEach(k => {
   const m = SKILL_META[k];
@@ -140,6 +160,8 @@ SKILL_ORDER.forEach(k => {
   SKILL_CLASS[k] = 'c-' + k;
   const firstChar = (m.key || m.label || '').trim().charAt(0).toLowerCase();
   SKILL_KEY[k] = firstChar === '\u00d7' ? 'x' : firstChar;   // both the x2 and x3 labels answer to the x key
+  SKILL_KEYS[k] = [SKILL_KEY[k]].concat(m.altKeys || []);   // every key that opens this skill (letter + altKeys)
+  SKILL_HAS_COUNT[k] = m.defaults.count !== undefined;      // has a "how many numbers" setting (Additions, Subtraction)
   DIFFICULTY_PRESETS[k] = m.presets;
   CUSTOM_NOTE[k] = m.customNote || '';
   if(m.noCustom) NO_CUSTOM[k] = true;

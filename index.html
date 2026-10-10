@@ -807,6 +807,21 @@
   </div>
 </div>
 
+<!-- one-time hint (iPhone/iPad only): the sign of a negative answer is not needed -->
+<div class="modal-overlay" id="signHintModal">
+  <div class="modal-box" role="dialog" aria-labelledby="sgTitle">
+    <div class="dh-title" id="sgTitle">Don't worry about the sign</div>
+    <p class="dh-text" id="sgText">Some answers are negative. The iPhone number pad has no minus key, so just type the number without it.</p>
+    <div class="dh-example">
+      <span class="dh-eq" id="sgEq">12 &minus; 30 = <b>&minus;18</b></span>
+      <span id="sgHow">Just type <b>18</b>.</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="btnSignHintOk">Got it</button>
+    </div>
+  </div>
+</div>
+
 <!-- one-time hint: keyboard shortcuts (desktop only, shown once) -->
 <div class="modal-overlay" id="shortcutHintModal">
   <div class="modal-box" role="dialog" aria-labelledby="shTitle">

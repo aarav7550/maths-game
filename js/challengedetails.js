@@ -46,7 +46,7 @@
 
   function buildCard(skillId, cfg){
     const level = matchingDifficultyForConfig(skillId, cfg);
-    const isAdd = skillId === 'add';
+    const isAdd = SKILL_HAS_COUNT[skillId];
 
     let rows = `
       <div class="cd-row"><span class="cd-label">Range</span><span class="cd-value">${cfg.min}–${cfg.max}</span></div>`;

@@ -2,19 +2,24 @@
 // SKILLS.JS — skill generators, difficulty draw helpers, state, DOM refs
 // ============================================================
 
-// ---------- decimal additions ----------
+// ---------- decimal additions / subtractions ----------
 // Turns a set of whole numbers into a question where one, two, or all of them get a
 // decimal part (one place, 1-9 tenths). Sums are done in tenths (whole numbers) and divided
 // by 10 once at the end, so answers like 16.8 are exact and match what the player types.
-function decimalAdditionQuestion(nums){
+// op is '+' (add them all) or '\u2212' (first number minus all the others; the answer can be negative).
+function decimalAdditionQuestion(nums){ return decimalQuestion(nums, '+'); }
+function decimalQuestion(nums, op){
   const n = nums.length;
   const options = [...new Set([1, Math.min(2, n), n])];   // how many numbers get decimals
   const howMany = options[randInt(0, options.length - 1)];
   const chosen = new Set();
   while(chosen.size < howMany) chosen.add(randInt(0, n - 1));
   const tenths = nums.map((v, i) => v * 10 + (chosen.has(i) ? randInt(1, 9) : 0));
-  const text = tenths.map((t, i) => chosen.has(i) ? (t / 10).toFixed(1) : String(nums[i])).join(' + ');
-  return { text, answer: tenths.reduce((a, b) => a + b, 0) / 10 };
+  const text = tenths.map((t, i) => chosen.has(i) ? (t / 10).toFixed(1) : String(nums[i])).join(' ' + op + ' ');
+  const total = op === '+'
+    ? tenths.reduce((a, b) => a + b, 0)
+    : tenths.slice(1).reduce((a, b) => a - b, tenths[0]);
+  return { text, answer: total / 10 };
 }
 
 // ---------- percentage reciprocals data ----------
@@ -68,6 +73,23 @@ const SKILLS = {
       const pct = ((DIFFICULTY_PRESETS.add || {})[level] || {}).decimalPct || 0;
       if(pct > 0 && randInt(1, 100) <= pct) return decimalAdditionQuestion(nums);
       return { text: nums.join(' + '), answer: nums.reduce((a,b) => a+b, 0) };
+    }
+  },
+  sub: {
+    hasDecimals: true,     // some questions have decimal numbers (drives the one-time hint popup)
+    canBeNegative: true,   // answers can be below zero (drives the one-time "ignore the sign" popup on iPhone/iPad)
+    gen(){
+      // Numbers are drawn at random from the range and the first one has the rest taken away, so how
+      // many answers go negative is pure chance - nothing forces or limits it. Only the decimal chance
+      // is limited, by the level's decimalPct (same as Additions).
+      const cfg = activeConfig('sub');
+      let min = Math.min(cfg.min,cfg.max), max = Math.max(cfg.min,cfg.max);
+      const count = cfg.count || 2;
+      const nums = drawUniqueSet('sub', min, max, cfg.parity, count);
+      const level = matchingDifficultyForConfig('sub', cfg);
+      const pct = ((DIFFICULTY_PRESETS.sub || {})[level] || {}).decimalPct || 0;
+      if(pct > 0 && randInt(1, 100) <= pct) return decimalQuestion(nums, '\u2212');
+      return { text: nums.join(' \u2212 '), answer: nums.slice(1).reduce((a, b) => a - b, nums[0]) };
     }
   },
   sq: {

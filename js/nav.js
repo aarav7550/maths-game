@@ -31,6 +31,8 @@
     if(exitOv && exitOv.classList.contains('show')){ document.getElementById('btnCancelExit').click(); return true; }
     const hintOv = document.getElementById('decimalHintModal');
     if(hintOv && hintOv.classList.contains('show')){ window.dismissDecimalHint(); return true; }
+    const signOv = document.getElementById('signHintModal');
+    if(signOv && signOv.classList.contains('show')){ window.dismissSignHint(); return true; }
     const diffOv = document.getElementById('diffModalOverlay');
     if(diffOv && diffOv.classList.contains('show')){ closeDifficultyPicker(); return true; }
     for(const id of ['mixedSoonModal','challengeShowModal','challengeEnterModal','settingsModal']){

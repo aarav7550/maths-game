@@ -76,6 +76,7 @@
 // - On the History screen the same letters open that skill's history page instead, and keep working on that page to switch skill.
 // - Skills that share a letter cycle: the key opens the skill AFTER the one the last letter press opened
 //   (x -> x2, x again -> x3, x again -> x2 ...). Only letter presses count, not mouse clicks.
+// - A skill can have extra keys on top of its letter (altKeys in js/registry.js): - opens Subtraction, = or + open Additions.
 // - Shift + H on Home opens History. Shift + M on Home opens the 3-dot menu with its first option highlighted;
 //   Up/Down arrows move through the options, Enter opens one, Esc closes it (Esc lives in nav.js).
 // - Ctrl + . opens (or closes) the Keyboard shortcuts popup from any screen except during a round.
@@ -101,7 +102,7 @@
   document.addEventListener('keydown', (e) => {
     if(e.defaultPrevented || e.repeat || e.isComposing) return;
     if(e.ctrlKey || e.metaKey || e.altKey) return;
-    if(!e.key || e.key.length !== 1 || !/[a-z]/i.test(e.key)) return;
+    if(!e.key || e.key.length !== 1 || !/[a-z=+\-]/i.test(e.key)) return;   // letters, plus - = + (the extra keys, see altKeys in registry.js)
     const t = e.target;
     if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
     if(otherPopupOpen()) return;
@@ -109,7 +110,7 @@
 
     const letter = e.key.toLowerCase();
 
-    if(e.shiftKey){
+    if(e.shiftKey && /[a-z]/.test(letter)){
       if(pickerOpen() || !homeActive()) return;   // Shift shortcuts are Home-only
       if(letter === 'h' && typeof renderHistory === 'function'){          // Shift + H: History
         e.preventDefault();
@@ -129,7 +130,7 @@
       return;
     }
 
-    const skills = SKILL_ORDER.filter(k => SKILL_KEY[k] === letter);
+    const skills = SKILL_ORDER.filter(k => SKILL_KEYS[k].includes(letter));
     if(!skills.length) return;
     e.preventDefault();
 
