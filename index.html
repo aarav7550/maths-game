@@ -79,7 +79,7 @@
    <div class="wrap">
 
     <div class="topbar">
-      <div class="brand">Numbers</div>
+      <div class="brand" data-app-name>Numbers</div>
       <div class="topbar-right">
         <button class="icon-btn" id="btnHistory" title="History">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -359,7 +359,8 @@
 
         <div class="actions">
           <button class="btn btn-ghost" id="btnHome">Home</button>
-          <button class="btn btn-ghost" id="btnShareSet">Share this set</button>
+          <button class="btn btn-ghost" id="btnShareSet">Challenge friends</button>
+          <button class="btn btn-ghost" id="btnShareImage">Share</button>
           <button class="btn btn-primary" id="btnAgain">Go again</button>
         </div>
       </div>
@@ -555,7 +556,7 @@
       </div>
 
       <div class="pg-hero">
-        <div class="pg-hero-title">Numbers</div>
+        <div class="pg-hero-title" data-app-name>Numbers</div>
         <div class="pg-hero-desc">A small daily drill for mental math, built to make CAT prep less painful. Pick a skill, race the clock, and watch your speed and accuracy improve over time.</div>
       </div>
 
@@ -792,6 +793,18 @@
   </div>
 </div>
 
+<!-- SHARE popup: a normal .modal-overlay (so js/popups.js animates it); contents filled in by js/share.js -->
+<div class="modal-overlay share-modal" id="shareModal" role="dialog" aria-modal="true" aria-label="Share your result">
+  <div class="modal-box share-modal-box">
+    <div class="share-modal-head">
+      <div class="share-modal-title">Your result</div>
+      <button class="share-modal-x" id="shareModalClose" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div class="share-modal-imgwrap"><img class="share-modal-img" id="shareModalImg" alt="Your result"></div>
+    <div class="share-modal-actions" id="shareModalActions"></div>
+  </div>
+</div>
+
 <!-- one-time hint: decimal answers -->
 <div class="modal-overlay" id="decimalHintModal">
   <div class="modal-box" role="dialog" aria-labelledby="dhTitle">
@@ -959,10 +972,13 @@
 
 <input type="file" id="importFileInput" accept=".json" style="display:none;">
 
+<script src="js/appname.js"></script>
 <script src="js/registry.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/skills.js"></script>
 <script src="js/game.js"></script>
+<script src="js/html2canvas.min.js"></script>
+<script src="js/share.js"></script>
 <script src="js/trendchart.js"></script>
 <script src="js/greetings.js"></script>
 <script src="js/ui.js"></script>

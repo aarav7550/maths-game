@@ -15,8 +15,38 @@ if(window.visualViewport){
   window.visualViewport.addEventListener('scroll', setRealVH);
 }
 
+// ---------- storage keys ----------
+// Every saved item lives under one prefix, and the prefix is NOT the display name (that comes from
+// manifest.json), so renaming the app again later never touches saved data.
+// Old versions saved under "numbers_"; the first run of this version copies anything found there
+// to the new names (the old copies are left in place, harmless). game.js reads its two hint keys from here too.
+const KEY_PREFIX = 'foxy_';
+const LEGACY_KEY_PREFIX = 'numbers_';
+const KEY_NAMES = {
+  sessions:    'game_sessions_v1',
+  practice:    'game_practice_sessions_v1',
+  config:      'game_config_v1',
+  included:    'game_mixed_included_v1',
+  displayName: 'display_name',
+  shortcutHint:'shortcutHintSeen',
+  lastLevel:   'game_last_level_v1',
+  lastCount:   'game_last_count_v1',
+  decimalHint: 'decimalHintSeen',
+  signHint:    'signHintSeen'
+};
+(function migrateLegacyKeys(){
+  try{
+    Object.keys(KEY_NAMES).forEach(k => {
+      const fresh = KEY_PREFIX + KEY_NAMES[k];
+      if(localStorage.getItem(fresh) !== null) return;                 // already on the new name
+      const old = localStorage.getItem(LEGACY_KEY_PREFIX + KEY_NAMES[k]);
+      if(old !== null) localStorage.setItem(fresh, old);
+    });
+  }catch(e){}
+})();
+
 // ---------- persistence ----------
-const STORAGE_KEY = 'numbers_game_sessions_v1';
+const STORAGE_KEY = KEY_PREFIX + KEY_NAMES.sessions;
 function loadSessions(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -30,7 +60,7 @@ let sessions = loadSessions();
 
 // Practice rounds (no timer) are stored separately so they never affect main
 // speed/accuracy stats or the history trend chart.
-const PRACTICE_STORAGE_KEY = 'numbers_game_practice_sessions_v1';
+const PRACTICE_STORAGE_KEY = KEY_PREFIX + KEY_NAMES.practice;
 function loadPracticeSessions(){
   try{
     const raw = localStorage.getItem(PRACTICE_STORAGE_KEY);
@@ -116,7 +146,7 @@ function decodeChallengeCode(code){
 // Starting config per skill comes from SKILL_META in js/registry.js
 const DEFAULT_CONFIG = {};
 SKILL_ORDER.forEach(k => DEFAULT_CONFIG[k] = Object.assign({}, SKILL_META[k].defaults));
-const CONFIG_KEY = 'numbers_game_config_v1';
+const CONFIG_KEY = KEY_PREFIX + KEY_NAMES.config;
 function loadConfig(){
   try{
     const raw = localStorage.getItem(CONFIG_KEY);
@@ -159,7 +189,7 @@ function activeIncludedList(){
 }
 
 // ---------- which skills are included when "Mixed" is played ----------
-const INCLUDED_KEY = 'numbers_game_mixed_included_v1';
+const INCLUDED_KEY = KEY_PREFIX + KEY_NAMES.included;
 const DEFAULT_INCLUDED = {};
 SKILL_ORDER.forEach(k => DEFAULT_INCLUDED[k] = true);
 function loadMixedIncluded(){
@@ -250,7 +280,7 @@ function drawUniqueSet(skillKey, min, max, parity, count){
 }
 
 // ---------- display name (Home page greeting) ----------
-const DISPLAY_NAME_KEY = 'numbers_display_name';
+const DISPLAY_NAME_KEY = KEY_PREFIX + KEY_NAMES.displayName;
 function getDisplayName(){
   try{ return localStorage.getItem(DISPLAY_NAME_KEY) || ''; }catch(e){ return ''; }
 }
@@ -319,7 +349,7 @@ function getLastSession(){
 // ---------- one-time hints ----------
 // The keyboard-shortcuts popup is shown once per device. If storage is blocked we say "seen",
 // so the popup can never nag on every visit.
-const SHORTCUT_HINT_KEY = 'numbers_shortcutHintSeen';
+const SHORTCUT_HINT_KEY = KEY_PREFIX + KEY_NAMES.shortcutHint;
 function shortcutHintSeen(){
   try{ return localStorage.getItem(SHORTCUT_HINT_KEY) === '1'; }catch(e){ return true; }
 }
@@ -330,7 +360,7 @@ function markShortcutHintSeen(){
 // ---------- last played difficulty (per skill) ----------
 // Remembers which level you last STARTED a round with, per skill, so the
 // difficulty picker can open with it already selected.
-const LAST_LEVEL_KEY = 'numbers_game_last_level_v1';
+const LAST_LEVEL_KEY = KEY_PREFIX + KEY_NAMES.lastLevel;
 function loadLastLevels(){
   try{
     const raw = localStorage.getItem(LAST_LEVEL_KEY);
@@ -347,7 +377,7 @@ function setLastLevel(skillKey, level){
 }
 
 // ---------- last played question count (per skill) ----------
-const LAST_COUNT_KEY = 'numbers_game_last_count_v1';
+const LAST_COUNT_KEY = KEY_PREFIX + KEY_NAMES.lastCount;
 function loadLastCounts(){
   try{
     const raw = localStorage.getItem(LAST_COUNT_KEY);

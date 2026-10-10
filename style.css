@@ -766,11 +766,18 @@
   }
   #view-results .btn-primary:hover{ opacity:1; }
 
+  /* Results action buttons: row 1 = Home / Challenge friends / Share, row 2 = Go again (full width, bigger) */
+  #view-results .actions .btn{ min-width:0; white-space:nowrap; }
+  #view-results #btnShareSet{ flex:1.7; }
+  #view-results #btnAgain{ flex:1 0 100%; font-size:16px; padding:17px; border-radius:13px; margin-top:4px; }
+
   @media (max-width:480px){
     #view-results{ padding:16px; }
     #view-results .page{ margin-top:20px; }
     #view-results .page-head{ margin-bottom:18px; }
     #view-results .card{ padding:18px; }
+    #view-results .actions .btn{ font-size:12.5px; padding:13px 4px; white-space:normal; line-height:1.2; }
+    #view-results #btnAgain{ font-size:15.5px; padding:16px; }
   }
 
   /* ---------- HISTORY view (Step 4a: Overview only) ---------- */
@@ -1824,3 +1831,32 @@
 .rv-stats{ display:grid; grid-template-columns:4.4em 6.4em 5.4em; column-gap:10px; margin-top:9px; font-size:13px; font-variant-numeric:tabular-nums; }
 .rv-st{ white-space:nowrap; }
 .rv-st.rv-avg, .rv-st.rv-acc{ font-weight:700; color:var(--primary); }
+
+/* ---------- SHARE popup (an ordinary .modal-overlay, so js/popups.js animates it; filled in by js/share.js) ---------- */
+.share-modal-box{ display:flex; flex-direction:column; max-height:100%; padding:16px; }
+.share-modal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-shrink:0; }
+.share-modal-title{ font-family:'Sora',sans-serif; font-weight:700; font-size:15px; color:var(--ink); }
+.share-modal-x{
+  width:30px; height:30px; border:none; background:none; border-radius:8px; cursor:pointer;
+  font-size:24px; line-height:1; color:var(--ink-dim);
+}
+.share-modal-x:hover{ color:var(--ink); }
+.share-modal-imgwrap{ flex:1 1 auto; min-height:0; overflow-y:auto; border-radius:10px; border:1px solid var(--line); }
+.share-modal-img{ display:block; width:100%; height:auto; }
+.share-modal-actions{ display:flex; gap:10px; margin-top:14px; flex-shrink:0; }
+.share-modal-btn{
+  flex:1; font-family:inherit; font-size:14px; font-weight:600; border-radius:11px; padding:13px 10px; cursor:pointer;
+  background:none; border:1px solid var(--line); color:var(--ink); box-shadow:none;
+}
+.share-modal-btn:hover{ background:var(--line-soft); }
+.share-modal-btn.primary{ border:none; font-weight:700; background:var(--share-accent,#007EA7); color:var(--share-accent-text,#FFFFFF); }
+.share-modal-btn.primary:hover{ background:var(--share-accent,#007EA7); opacity:0.92; }
+
+@media (min-width:641px){
+  .share-modal-box{ max-width:440px; }
+  .share-modal-imgwrap{ max-height:calc(100vh - 190px); }
+}
+@media (max-width:640px){
+  .share-modal-box{ max-width:420px; }
+  .share-modal-imgwrap{ max-height:calc(100vh - 180px); }
+}

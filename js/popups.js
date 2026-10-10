@@ -19,7 +19,7 @@
   const EASE_OUT = 'cubic-bezier(.22,.7,.25,1)';
   const EASE_IN  = 'cubic-bezier(.4,0,.6,1)';
 
-  const OVERLAY_IDS = ['diffModalOverlay','mixedSoonModal','nameOverlay','exitModal','challengeShowModal','challengeEnterModal','shortcutHintModal','shortcutsModal','reviewModal','signHintModal'];
+  const OVERLAY_IDS = ['diffModalOverlay','mixedSoonModal','nameOverlay','exitModal','challengeShowModal','challengeEnterModal','shortcutHintModal','shortcutsModal','reviewModal','signHintModal','shareModal'];
   // only these popups grow from the tapped element; the rest pop from the centre
   const ORIGIN_OVERLAYS = new Set(['diffModalOverlay','mixedSoonModal','nameOverlay']);
   const ORIGIN_SELECTOR = '.skill-card:not(.soon), #btnMixedStart, #greetName, #dgreetName';

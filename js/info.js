@@ -103,8 +103,8 @@
 
     const payload = Object.fromEntries(new FormData(form).entries());   // name, email, message, botcheck (only if a bot ticked it)
     payload.access_key = WEB3FORMS_KEY;
-    payload.subject = 'Numbers app: bug report';
-    payload.from_name = 'Numbers app';
+    payload.subject = 'Foxy Math Game: bug report';
+    payload.from_name = 'Foxy Math Game';
 
     sendBtn.disabled = true;
     sendBtn.textContent = 'Sending…';

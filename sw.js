@@ -1,5 +1,5 @@
 // Bump this version string whenever you deploy changes so devices notice a new version.
-const CACHE_VERSION = 'numbers-v60';
+const CACHE_VERSION = 'numbers-v62';
 const CACHE_NAME = `numbers-cache-${CACHE_VERSION}`;
 
 const ASSETS = [
@@ -21,6 +21,9 @@ const ASSETS = [
   './js/info.js',
   './js/nav.js',
   './js/keys.js',
+  './js/html2canvas.min.js',
+  './js/share.js',
+  './js/appname.js',
   './manifest.json',
   './fonts/inter-latin-wght-normal.woff2',
   './fonts/sora-latin-wght-normal.woff2',
