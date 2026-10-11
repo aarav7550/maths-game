@@ -253,11 +253,13 @@ function openReview(s){
   rvBodyEl.scrollTop = 0;
   reviewOpenedAt = Date.now();
   reviewModal.classList.add('show');
+  if(isReviewable(s) && typeof window.prepareSessionShare === 'function') window.prepareSessionShare(s);   // build the share image in the background (js/share.js)
 }
 function closeReview(){ reviewCurrent = null; closeLevelPop(); rvLevelPopEl.classList.remove('show'); reviewModal.classList.remove('show'); }
 function reviewIsOpen(){ return reviewModal.classList.contains('show'); }
 
 // One delegated listener per session list (the lists re-render, so nothing is bound per row).
+const TAP_FEEDBACK_MS = 150;  // a quick tap shows the float look for this long before the review opens
 const HOLD_DELAY_MS = 90;    // a finger must rest this long before the row starts floating
 let touchOpenedAt = 0;       // when a touch release last opened a review (the click that follows is then ignored)
 let lastPointerWasTouch = false;
@@ -291,9 +293,15 @@ function wireRowHold(list){
   }, { passive: false });
   list.addEventListener('pointerup', (e) => {
     if(!row || e.pointerId !== pid) return;
-    const r = row; release();
+    const r = row;
+    const wasHeld = r.classList.contains('is-held');
+    clearTimeout(timer); timer = 0; row = null; pid = null;
     const s = findRound(Number(r.dataset.date), r.dataset.prac === '1');
-    if(s && isReviewable(s)){ touchOpenedAt = Date.now(); openReview(s); }   // released on the same row = a tap
+    if(s && isReviewable(s)) touchOpenedAt = Date.now();   // released on the same row = a tap (the click that follows is ignored)
+    const finish = () => { r.classList.remove('is-held'); if(s && isReviewable(s)) openReview(s); };
+    if(wasHeld){ finish(); return; }                       // a held row already showed the float look
+    r.classList.add('is-held');                            // quick tap: show the same float look briefly, then open
+    setTimeout(finish, TAP_FEEDBACK_MS);
   });
   list.addEventListener('pointercancel', release);        // the browser took over for scrolling
   // a long press must not pop up the phone's text-selection / context menu on these rows
@@ -322,7 +330,7 @@ reviewModal.addEventListener('click', (e) => { if(e.target === reviewModal && Da
 wireLevelPopovers(rvHeadEl);
 // Esc closes the review first (and stops there, so it can't also act as "go back a screen")
 window.addEventListener('keydown', (e) => {
-  if(e.key === 'Escape' && reviewIsOpen()){
+  if(e.key === 'Escape' && reviewIsOpen() && !document.getElementById('shareModal').classList.contains('show')){   // if the share popup is open on top, it handles its own Esc
     closeReview();
     e.preventDefault();
     e.stopImmediatePropagation();

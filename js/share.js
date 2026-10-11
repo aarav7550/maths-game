@@ -60,8 +60,11 @@
   function isPhone(){ return window.matchMedia && window.matchMedia('(pointer:coarse)').matches; }
 
   // ---------- app name (from manifest.json, see js/appname.js) ----------
+  let appNameP = null;   // remembered after the first lookup, so later taps don't wait for it
   function getAppName(){
-    return window.getAppName ? window.getAppName() : Promise.resolve(document.title.split(' \u2014 ')[0]);
+    if(!appNameP) appNameP = (window.getAppName ? Promise.resolve(window.getAppName()) : Promise.resolve(document.title.split(' \u2014 ')[0]))
+      .catch(() => document.title.split(' \u2014 ')[0]);
+    return appNameP;
   }
 
   // ---------- the image: a styled copy of the real results box ----------
@@ -96,13 +99,14 @@
   // Where the card's content comes from:
   //  - the live Results screen (a copy of #card), or
   //  - a saved round from History (built from the saved record, same classes so the same styles apply).
+  let resultsStamp = 0;   // when the round on the Results screen finished (set by prepareResultsShare, called from game.js)
   function sourceFromResults(){
     const view = document.getElementById('view-results');
     const cs   = getComputedStyle(view);
     const box  = document.getElementById('card').cloneNode(true);
     box.querySelectorAll('.actions').forEach(n => n.remove());
     return { box: box, accentHex: cs.getPropertyValue('--r-accent').trim(),
-             accentText: cs.getPropertyValue('--r-accent-text').trim() || '#FFFFFF', when: new Date() };
+             accentText: cs.getPropertyValue('--r-accent-text').trim() || '#FFFFFF', when: resultsStamp ? new Date(resultsStamp) : new Date() };
   }
 
   function sourceFromSession(rec){
@@ -133,7 +137,8 @@
     } else { wrong = d.wrong || []; slow = d.slow || []; }
 
     const num   = v => (typeof v === 'number' && isFinite(v)) ? v.toFixed(1) + 's' : '—';   // best time may be missing -> dash
-    const title = rec.accuracy === 100 ? 'Flawless round' : (rec.accuracy >= 80 ? 'Solid round' : 'Round complete');   // same rule as game.js
+    const who   = (typeof getDisplayName === 'function') ? getDisplayName() : '';   // current name ('' if not set); rounds don't save a name
+    const title = (rec.accuracy === 100 ? 'Flawless round' : (rec.accuracy >= 80 ? 'Solid round' : 'Round complete')) + (who ? ', ' + esc(who) : '');   // same rule as game.js
 
     let html =
       '<div class="title">' + title + '</div>' +
@@ -218,7 +223,7 @@
     const img     = document.getElementById('shareModalImg');
     const actions = document.getElementById('shareModalActions');
     const xBtn    = document.getElementById('shareModalClose');
-    const url     = URL.createObjectURL(o.blob);
+    const url     = o.url;   // made (and decoded) when the image was built; freed when the image is dropped from the cache
     const phone   = isPhone();
 
     img.src = url;
@@ -309,7 +314,6 @@
       modal.removeEventListener('click', onBackdrop);
       xBtn.removeEventListener('click', close);
       modal.classList.remove('show');                           // popups.js plays the exit animation
-      setTimeout(() => URL.revokeObjectURL(url), 600);          // keep the image alive until the exit animation is done
       closeActive = null;
     }
     closeActive = close;
@@ -321,31 +325,102 @@
     if(firstBtn) firstBtn.focus();
   }
 
+  // ---------- image cache ----------
+  // The image is built once and remembered, so tapping Share again (or tapping after it was pre-built in the
+  // background, see prebuild below) opens the popup straight away. The key is the card's own content, so if
+  // anything on the card changes (numbers, name, accent colour, app name) a fresh image is made automatically.
+  const CACHE_MAX = 6;           // images kept (oldest dropped first)
+  const cache = new Map();       // key -> finished image
+  const building = new Map();    // key -> an image being built right now (so two requests never build it twice)
+
+  function cacheKey(appName, src){
+    return appName + '|' + src.accentHex + '|' + src.when.getTime() + '|' + src.box.innerHTML;   // must be read BEFORE buildCard changes the box
+  }
+
+  async function buildImage(appName, src){
+    const built = buildCard(appName, src);
+    document.body.appendChild(built.wrap);
+    try{
+      if(document.fonts && document.fonts.ready) await document.fonts.ready;   // so Sora/Inter are used, not fallbacks
+      const canvas = await html2canvas(built.wrap, { scale: SCALE, backgroundColor: C.page, useCORS: true, logging: false });
+      const blob = await new Promise(res => canvas.toBlob(res, IMAGE_TYPE, JPG_QUALITY));
+      if(!blob) throw new Error('could not create image');
+      const fileName = slug(appName) + '-result.' + IMAGE_EXT;
+      const file = new File([blob], fileName, { type: IMAGE_TYPE });
+      const url = URL.createObjectURL(blob);   // made once per image; freed when the image is dropped from the cache
+      return { url: url, canvas: IMAGE_TYPE === 'image/png' ? null : canvas,   // the canvas is only needed for Copy when the image isn't a PNG
+               blob: blob, file: file, fileName: fileName, appName: appName,
+               accent: built.accent, accentText: built.accentText };
+    } finally {
+      built.wrap.remove();
+    }
+  }
+
+  function getImage(appName, src){
+    if(typeof html2canvas !== 'function') return Promise.reject(new Error('html2canvas not loaded'));
+    const key = cacheKey(appName, src);
+    if(cache.has(key)) return Promise.resolve(cache.get(key));
+    if(building.has(key)) return building.get(key);
+    const p = buildImage(appName, src).then(img => {
+      cache.set(key, img);
+      while(cache.size > CACHE_MAX){ const oldest = cache.keys().next().value; URL.revokeObjectURL(cache.get(oldest).url); cache.delete(oldest); }
+      return img;
+    }).finally(() => building.delete(key));
+    building.set(key, p);
+    return p;
+  }
+
+  // Build the image quietly in the background so it's already waiting when Share is tapped.
+  // It starts right after the next screen paint (so the popup / screen shows first), plus an optional extra delay.
+  // If nobody taps Share the image just sits in the cache until newer ones push it out (CACHE_MAX).
+  function prebuild(src, delay){
+    const run = () => { getAppName().then(n => getImage(n, src)).catch(() => {}); };
+    requestAnimationFrame(() => setTimeout(run, delay));
+  }
+  // Results: wait 500ms so the screen slide-in (300ms) isn't interrupted. History: start straight away.
+  window.prepareResultsShare = function(){ resultsStamp = Date.now(); prebuild(sourceFromResults(), 500); };   // called by game.js when Results opens
+  window.prepareSessionShare = function(rec){ prebuild(sourceFromSession(rec), 0); };                         // called by history.js when the review popup opens
+
+  // TEMPORARY: shows a small timing note at the top of the screen after each Share tap (set to false / delete when done testing)
+  const DEBUG_TIMING = false;
+  function debugNote(text){
+    let d = document.getElementById('shareDebugNote');
+    if(!d){
+      d = document.createElement('div'); d.id = 'shareDebugNote';
+      d.style.cssText = 'position:fixed;top:8px;left:8px;right:8px;z-index:9999;background:#000;color:#0f0;font:12px/1.4 monospace;padding:8px 10px;border-radius:8px;pointer-events:none;';
+      document.body.appendChild(d);
+    }
+    d.textContent = text; d.style.display = 'block';
+    clearTimeout(d._t); d._t = setTimeout(() => { d.style.display = 'none'; }, 8000);
+  }
+
   // ---------- main ----------
   // btn: the button that was tapped. src: where the card content comes from (omit = live Results screen).
   // Text buttons (Results "Share") change their label while working; icon buttons get is-busy / is-failed instead.
   async function makeAndPreview(btn, src){
+    src = src || sourceFromResults();
     const textBtn  = !btn.querySelector('svg');
     const original = textBtn ? btn.textContent : '';
     btn.disabled = true;
-    if(textBtn) btn.textContent = 'Preparing…'; else btn.classList.add('is-busy');
-    let built = null;
+    const t0 = performance.now();
+    let wasCached = true;
 
     try{
-      if(typeof html2canvas !== 'function') throw new Error('html2canvas not loaded');
       const appName = await getAppName();
-      built = buildCard(appName, src);
-      document.body.appendChild(built.wrap);
-      if(document.fonts && document.fonts.ready) await document.fonts.ready;   // so Sora/Inter are used, not fallbacks
-
-      const canvas = await html2canvas(built.wrap, { scale: SCALE, backgroundColor: C.page, useCORS: true, logging: false });
-      const blob = await new Promise(res => canvas.toBlob(res, IMAGE_TYPE, JPG_QUALITY));
-      if(!blob) throw new Error('could not create image');
-
-      const fileName = slug(appName) + '-result.' + IMAGE_EXT;
-      const file = new File([blob], fileName, { type: IMAGE_TYPE });
-      openPreview({ canvas: canvas, blob: blob, file: file, fileName: fileName,
-                    appName: appName, accent: built.accent, accentText: built.accentText });
+      if(!cache.has(cacheKey(appName, src))){
+        wasCached = false;
+        // not ready yet: show "Preparing" and let the browser paint it BEFORE the heavy work starts
+        if(textBtn) btn.textContent = 'Preparing'; else btn.classList.add('is-busy');
+        await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+      }
+      const img = await getImage(appName, src);
+      const t1 = performance.now();
+      openPreview(img);
+      if(DEBUG_TIMING) requestAnimationFrame(() => requestAnimationFrame(() => {
+        const t2 = performance.now();
+        debugNote((textBtn ? 'RESULTS' : 'HISTORY') + ' | image ' + (wasCached ? 'was ready (cache hit)' : 'NOT ready (built on tap)') +
+                  ' | tap->image ' + Math.round(t1 - t0) + 'ms | image->popup painted ' + Math.round(t2 - t1) + 'ms');
+      }));
       if(textBtn) btn.textContent = original;
     }catch(err){
       console.error('Share failed:', err);
@@ -357,11 +432,17 @@
         setTimeout(() => btn.classList.remove('is-failed'), 2000);
       }
     }finally{
-      if(built) built.wrap.remove();
       btn.classList.remove('is-busy');
       btn.disabled = false;
     }
   }
+
+  // lets nav.js (system Back) close this popup properly; returns true if it was open
+  window.closeSharePopup = function(){
+    const m = document.getElementById('shareModal');
+    if(closeActive && m && m.classList.contains('show')){ closeActive(); return true; }
+    return false;
+  };
 
   // History: share a saved round (called from the review popup's share icon in history.js)
   window.shareSession = function(rec, btn){ return makeAndPreview(btn, sourceFromSession(rec)); };

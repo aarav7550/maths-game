@@ -23,6 +23,10 @@
 
   // ---- popups that Back should close first (top-most first) ----
   function closeTopPopup(){
+    // the share popup sits on top of the History review popup, so it is checked first
+    if(typeof window.closeSharePopup === 'function' && window.closeSharePopup()) return true;
+    const reviewOv = document.getElementById('reviewModal');
+    if(reviewOv && reviewOv.classList.contains('show') && typeof closeReview === 'function'){ closeReview(); return true; }
     const dropdown = document.getElementById('moreMenuDropdown');
     if(dropdown && dropdown.classList.contains('open')){ dropdown.classList.remove('open'); return true; }
     const nameOv = document.getElementById('nameOverlay');

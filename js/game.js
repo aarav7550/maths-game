@@ -439,8 +439,9 @@ function finishRound(){
   document.getElementById('resAcc').textContent = accuracy + '%';
   document.getElementById('resAvg').textContent = avgTime.toFixed(1) + 's';
   document.getElementById('resBest').textContent = bestTime.toFixed(1) + 's';
+  const resName = getDisplayName();   // '' when no name is set
   document.getElementById('resultsTitle').textContent =
-    accuracy === 100 ? 'Flawless round' : (accuracy >= 80 ? 'Solid round' : 'Round complete');
+    (accuracy === 100 ? 'Flawless round' : (accuracy >= 80 ? 'Solid round' : 'Round complete')) + (resName ? ', ' + resName : '');
 
   // Results page picks up the played skill's accent colour (Mixed uses the neutral primary blue)
   const resAccent = state.skill === 'mixed' ? '#007EA7' : (SKILL_COLOR[state.skill] || '#007EA7');
@@ -476,6 +477,7 @@ function finishRound(){
   }
 
   showView('results');
+  if(typeof window.prepareResultsShare === 'function') window.prepareResultsShare();   // build the share image in the background (js/share.js)
 }
 
 function renderResultsBreakdown(){

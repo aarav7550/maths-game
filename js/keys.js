@@ -49,7 +49,7 @@
     if(e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
     const ovs = openOverlays();
     if(!ovs.length) return;
-    const ov = ovs[ovs.length - 1];
+    const ov = ovs.find(o => o.id === 'shareModal') || ovs[ovs.length - 1];   // the share popup is always on top of the review popup
     const btns = buttonsIn(ov);
     if(!btns.length) return;
     const active = document.activeElement;
