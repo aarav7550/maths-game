@@ -101,9 +101,9 @@ const SKILL_META = {
     label: 'Square', icon: 'x²', desc: 'Square the number', color: '#C6473A', group: 'powers',
     defaults: { min: 2, max: 30, parity: 'any' },
     presets: {
-      veryeasy: { min: 1, max: 15, secs: 5 },
-      easy: { min: 16, max: 30, secs: 8 },
-      difficult: { min: 31, max: 100, secs: 20 }
+      veryeasy: { min: 2, max: 20, secs: 5 },
+      easy: { min: 21, max: 40, secs: 8 },
+      difficult: { min: 41, max: 100, secs: 20 }
     },
     customNote: 'Pick your own min/max and number type before you start.'
   },
@@ -111,9 +111,8 @@ const SKILL_META = {
     label: 'Cube', icon: 'x³', desc: 'Cube the number', color: '#2E8FA6', group: 'powers',
     defaults: { min: 2, max: 20, parity: 'any' },
     presets: {
-      veryeasy: { min: 1, max: 15, secs: 8 },
-      easy: { min: 16, max: 30, secs: 10 },
-      difficult: { min: 31, max: 100, secs: 30 }
+      easy: { min: 2, max: 20, secs: 15 },
+      difficult: { min: 21, max: 100, secs: 30 }
     },
     customNote: 'Pick your own min/max and number type before you start.'
   },
@@ -121,7 +120,7 @@ const SKILL_META = {
     label: 'Tables', icon: '3×7', desc: 'Recall multiplication tables', color: '#6C63C6', group: 'recall',
     defaults: { min: 2, max: 20, parity: 'any' },
     presets: {
-      veryeasy: { min: 1, max: 10, secs: 8 },
+      veryeasy: { min: 2, max: 10, secs: 8 },
       easy: { min: 11, max: 20, secs: 10 },
       difficult: { min: 21, max: 30, secs: 15 },
       verydifficult: { min: 31, max: 40, secs: 18 }

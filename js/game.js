@@ -478,6 +478,7 @@ function finishRound(){
 
   showView('results');
   if(typeof window.prepareResultsShare === 'function') window.prepareResultsShare();   // build the share image in the background (js/share.js)
+  if(accuracy >= 80 && typeof window.fireConfetti === 'function') window.fireConfetti();   // confetti for 80%+ accuracy (js/confetti.js)
 }
 
 function renderResultsBreakdown(){
