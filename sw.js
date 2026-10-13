@@ -1,5 +1,5 @@
 // Bump this version string whenever you deploy changes so devices notice a new version.
-const CACHE_VERSION = 'foxy-v72';
+const CACHE_VERSION = 'foxy-v75';
 const CACHE_NAME = `foxy-cache-${CACHE_VERSION}`;
 // Caches from the old app name. Deleted on activate so devices don't keep the old copies.
 const OLD_CACHE_PREFIXES = ['numbers-cache-', 'foxy-cache-'];
@@ -14,6 +14,7 @@ const ASSETS = [
   './js/popups.js',
   './js/game.js',
   './js/confetti.js',
+  './js/confetti-worker.js',
   './js/trendchart.js',
   './js/greetings.js',
   './js/ui.js',
@@ -24,8 +25,10 @@ const ASSETS = [
   './js/info.js',
   './js/nav.js',
   './js/keys.js',
+  './js/share-card.js',
   './js/html2canvas.min.js',
   './js/share.js',
+  './js/share-card.js',
   './js/appname.js',
   './manifest.json',
   './fonts/inter-latin-wght-normal.woff2',

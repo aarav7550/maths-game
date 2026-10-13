@@ -2,32 +2,31 @@
    share.js — "Share" button on the Results screen.
 
    What happens when you tap Share:
-   1. A copy of the real results box (#card) is made, WITHOUT the buttons, and the
-      app name + date/time are added at the bottom. (From History, the same box is built from a saved
-      round instead: window.shareSession(round, button).) It's built off-screen so the
-      image looks the same on every device.
-   2. html2canvas turns that copy into an image (PNG, see IMAGE_TYPE below).
+   1. The content of the real results box (#card) is read as plain data (title, note, stats, rows),
+      WITHOUT the buttons, and the app name + date/time are added for the footer. (From History, the same data
+      is built from a saved round instead: window.shareSession(round, button).)
+   2. js/share-card.js DRAWS that data as an image (PNG, see IMAGE_TYPE below). It runs in a Web Worker, which is
+      a separate CPU core, so the page never freezes while the image is made. (html2canvas is no longer used.)
+      If a Worker can't run, the same drawing code runs on the main thread instead (slower, but works).
    3. A popup shows the image with buttons:
         phone   -> [Share] [Save to device] [copy icon]
         desktop -> [Copy]  [Download]
 
    NOTES
-   - html2canvas can't read the page's CSS variables / color-mix(), and the page's
-     results styles only apply inside #view-results. So the off-screen copy gets the
-     same styles written inline by STYLE_MAP below. If you restyle the Results card
-     in style.css, mirror the change in STYLE_MAP.
+   - The look of the image (colours, sizes, spacing) is in js/share-card.js, not here. If you restyle the
+     Results card in style.css, mirror the change there (it replaces the old STYLE_MAP that used to be in this file).
+   - This file only READS the card (extractCard / rowModel) and caps the lists. The class names it reads
+     (.title, .config-note, .stat-box, .section, .detail-row, .skill-row, .miss-row ...) must stay on the Results card.
    - The app name comes from manifest.json via window.getAppName() (js/appname.js).
    - The image is capped so it never gets huge: MAX_SLOWEST slow questions and MAX_MISSED wrong answers
      (anything beyond that is left out and the section title says "first 10 of 50").
    - The popup is the static #shareModal in index.html (a normal .modal-overlay), so js/popups.js
      animates it like every other popup. This file only fills it and toggles .show.
    - Copy needs a PNG (browsers can't copy JPGs to the clipboard). While IMAGE_TYPE is PNG the same
-     file is used; if you switch to JPG, Copy quietly makes a PNG for itself.
+     file is used; if you switch to JPG, the worker also makes a PNG just for Copy.
    ========================================================================== */
 
 (function(){
-  const CARD_W = 400;      // css px; captured at SCALE x => 1200px wide image
-  const SCALE  = 3;
   // PNG, not JPG: this image is flat colours + small text, which JPG blurs (and PNG is the smaller file here too).
   // To go back to JPG: IMAGE_TYPE = 'image/jpeg' and IMAGE_EXT = 'jpg'.
   const IMAGE_TYPE  = 'image/png';
@@ -40,20 +39,12 @@
   const MAX_SLOWEST = 5;   // slowest questions shown in the image
   const MAX_MISSED  = 5;   // wrong answers shown in the image
 
-  const C = { text:'#14171C', dim:'#6B7280', statBg:'#F6F9FA', line:'#E1EAEC',
-              bad:'#C6544A', badBg:'#FBF0EF', badBd:'#F3D9D6', page:'#F3FAFB' };
-
   // ---------- small helpers ----------
   function hexToRgb(hex){
     let h = String(hex || '').trim().replace('#','');
     if(h.length === 3) h = h.split('').map(c => c + c).join('');
     if(!/^[0-9a-fA-F]{6}$/.test(h)) return null;
     return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
-  }
-  // mix colour with white; pct = how much of the colour to keep (0–100)
-  function tint(rgb, pct){
-    const k = pct / 100;
-    return 'rgb(' + rgb.map(v => Math.round(v * k + 255 * (1 - k))).join(',') + ')';
   }
   function esc(v){ return String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function slug(s){ return String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'result'; }
@@ -67,33 +58,62 @@
     return appNameP;
   }
 
-  // ---------- the image: a styled copy of the real results box ----------
-  function styleMap(tintBg, tintBd){
-    return [
-      ['.title',               'font-family:Sora,sans-serif;font-size:19px;font-weight:700;margin-bottom:8px;color:' + C.text],
-      ['.config-note',         'font-size:12.5px;color:' + C.dim + ';line-height:1.6;background:' + tintBg + ';border:1px solid ' + tintBd + ';border-radius:9px;padding:10px 13px;margin-bottom:20px'],
-      ['.config-note b',       'color:' + C.text],
-      ['.stats-grid',          'display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px'],
-      ['.stat-box',            'background:' + C.statBg + ';border-radius:11px;padding:15px 8px;text-align:center'],
-      ['.stat-box.s-acc, .stat-box.s-avg', 'background:' + tintBg],
-      ['.stat-box .num',       'font-family:Inter,sans-serif;font-size:25px;font-weight:700;font-variant-numeric:tabular-nums;color:' + C.text],
-      ['.stat-box .lbl',       'font-size:11px;color:' + C.dim + ';margin-top:4px'],
-      ['.section',             'margin-bottom:20px'],
-      ['.section-title',       'font-size:12px;font-weight:600;color:' + C.dim + ';margin-bottom:9px'],
-      ['.detail-list',         'display:flex;flex-direction:column;gap:7px'],
-      ['.detail-row',          'display:flex;justify-content:space-between;align-items:center;gap:10px;background:' + C.statBg + ';border-radius:9px;padding:10px 13px;font-size:13.5px'],
-      ['.dr-problem',          'font-weight:700;font-variant-numeric:tabular-nums;color:' + C.text + ';white-space:nowrap'],
-      ['.dr-skilltag',         'font-size:11px;font-weight:400;color:' + C.dim + ';margin-left:7px'],
-      ['.dr-time',             'font-weight:700;font-variant-numeric:tabular-nums;color:' + C.text],
-      ['.skill-row',           'display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px 0;background:' + C.statBg + ';border-radius:9px;padding:10px 13px;font-size:13.5px'],
-      ['.skill-row .name',     'font-weight:600;color:' + C.text],
-      ['.skill-row .nums',     'display:flex;gap:12px;font-size:12px;color:' + C.dim + ';font-variant-numeric:tabular-nums'],
-      ['.skill-row .nums b',   'color:' + C.text],
-      ['.miss-row',            'display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px 10px;background:' + C.badBg + ';border:1px solid ' + C.badBd + ';border-radius:9px;padding:10px 13px;font-size:13.5px'],
-      ['.miss-nums',           'display:flex;gap:8px'],
-      ['.miss-row .you',       'color:' + C.bad + ';font-size:12px;font-variant-numeric:tabular-nums'],
-      ['.miss-row .correct',   'color:' + C.dim + ';font-size:12px;font-variant-numeric:tabular-nums']
-    ];
+  // ---------- reading the card's content as plain data (js/share-card.js draws it) ----------
+  const squash = v => String(v || '').replace(/\s+/g, ' ').trim();
+  const isBold = n => n.tagName === 'B' || n.tagName === 'STRONG';
+  // text pieces of a node as [{t, b}] (b = bold). <br> starts a new paragraph, so the result is a list of paragraphs.
+  function runsOf(node, bold, out){
+    node.childNodes.forEach(n => {
+      if(n.nodeType === 3) out[out.length - 1].push({ t: n.nodeValue, b: bold });
+      else if(n.nodeType === 1){
+        if(n.tagName === 'BR') out.push([]);
+        else runsOf(n, bold || isBold(n), out);
+      }
+    });
+    return out;
+  }
+  const textIn = (el, sel) => { const n = el.querySelector(sel); return n ? squash(n.textContent) : ''; };
+
+  // one row of a list -> plain data, or null if it isn't a known row type
+  function rowModel(el){
+    const cl = el.classList;
+    let q = '', tag = '';
+    const prob = el.querySelector('.dr-problem');
+    if(prob){
+      tag = textIn(prob, '.dr-skilltag');
+      const c = prob.cloneNode(true);
+      c.querySelectorAll('.dr-skilltag').forEach(n => n.remove());
+      q = squash(c.textContent);
+    }
+    if(cl.contains('detail-row')) return { type:'detail', q: q, tag: tag, time: textIn(el, '.dr-time') };
+    if(cl.contains('miss-row'))   return { type:'miss',   q: q, tag: tag, you: textIn(el, '.you'), right: textIn(el, '.correct') };
+    if(cl.contains('skill-row')){
+      const nums = [];
+      const nEl = el.querySelector('.nums');
+      if(nEl) nEl.childNodes.forEach(n => {
+        if(n.nodeType === 1) nums.push(runsOf(n, isBold(n), [[]])[0]);
+        else if(n.nodeType === 3 && squash(n.nodeValue)) nums.push([{ t: n.nodeValue, b: false }]);
+      });
+      return { type:'skill', name: textIn(el, '.name'), nums: nums };
+    }
+    return null;
+  }
+
+  function extractCard(box){
+    const noteEl = box.querySelector('.config-note');
+    const kinds  = ['acc', 'avg', 'best'];   // stat boxes are always accuracy, avg time, best time (used if the s-* classes are missing)
+    return {
+      title: textIn(box, '.title'),
+      note:  noteEl ? runsOf(noteEl, false, [[]]) : [],
+      stats: Array.from(box.querySelectorAll('.stat-box')).map((b, i) => ({
+        num: textIn(b, '.num'), lbl: textIn(b, '.lbl'),
+        kind: b.classList.contains('s-acc') ? 'acc' : b.classList.contains('s-avg') ? 'avg' : b.classList.contains('s-best') ? 'best' : (kinds[i] || '')
+      })),
+      sections: Array.from(box.querySelectorAll('.section')).map(sec => ({
+        title: textIn(sec, '.section-title'),
+        rows:  Array.from(sec.querySelectorAll('.detail-row, .skill-row, .miss-row')).map(rowModel).filter(Boolean)
+      })).filter(sec => sec.rows.length)
+    };
   }
 
   // Where the card's content comes from:
@@ -105,6 +125,9 @@
     const cs   = getComputedStyle(view);
     const box  = document.getElementById('card').cloneNode(true);
     box.querySelectorAll('.actions').forEach(n => n.remove());
+    // sections hidden on screen (e.g. "Missed" after a perfect round) must not appear in the image
+    const liveSecs = document.getElementById('card').querySelectorAll('.section');
+    box.querySelectorAll('.section').forEach((sec, i) => { if(liveSecs[i] && getComputedStyle(liveSecs[i]).display === 'none') sec.remove(); });
     return { box: box, accentHex: cs.getPropertyValue('--r-accent').trim(),
              accentText: cs.getPropertyValue('--r-accent-text').trim() || '#FFFFFF', when: resultsStamp ? new Date(resultsStamp) : new Date() };
   }
@@ -166,51 +189,87 @@
     return { box: box, accentHex: accentHex, accentText: '#FFFFFF', when: new Date(rec.date) };   // footer shows when the round was played
   }
 
-  function buildCard(appName, src){
-    src = src || sourceFromResults();
-    const rgb    = hexToRgb(src.accentHex) || [0,126,167];
-    const accent = 'rgb(' + rgb.join(',') + ')';
-    const tintBg = tint(rgb, 12);
-    const tintBd = tint(rgb, 32);
-
-    // minus ids, so nothing clashes with the real page
-    const box = src.box;
-    box.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
-    box.removeAttribute('id');
+  // everything the worker needs to draw the image, as plain data
+  function buildModel(appName, src){
+    const model = extractCard(src.box);
 
     // keep the image a sensible length: cap the lists (rows are in the same order as on screen)
-    box.querySelectorAll('.detail-row').forEach((row, i) => { if(i >= MAX_SLOWEST) row.remove(); });
-    const missRows = box.querySelectorAll('.miss-row');
-    if(missRows.length > MAX_MISSED){
-      const title = missRows[0].closest('.section').querySelector('.section-title');
-      if(title) title.textContent = 'Missed (first ' + MAX_MISSED + ' of ' + missRows.length + ')';
-      missRows.forEach((row, i) => { if(i >= MAX_MISSED) row.remove(); });
+    let shown = 0;
+    model.sections.forEach(sec => { sec.rows = sec.rows.filter(r => r.type !== 'detail' || ++shown <= MAX_SLOWEST); });
+    let missTotal = 0;
+    model.sections.forEach(sec => sec.rows.forEach(r => { if(r.type === 'miss') missTotal++; }));
+    if(missTotal > MAX_MISSED){
+      let kept = 0, titled = false;
+      model.sections.forEach(sec => {
+        if(!titled && sec.rows.some(r => r.type === 'miss')){ sec.title = 'Missed (first ' + MAX_MISSED + ' of ' + missTotal + ')'; titled = true; }
+        sec.rows = sec.rows.filter(r => r.type !== 'miss' || ++kept <= MAX_MISSED);
+      });
     }
-    box.style.cssText = 'background:#FFFFFF;border:1px solid ' + tintBd + ';border-radius:16px;padding:18px;';
-    styleMap(tintBg, tintBd).forEach(([sel, css]) => {
-      box.querySelectorAll(sel).forEach(n => { n.style.cssText += ';' + css; });
-    });
 
     // footer: app name (left) + date/time (right)
-    const when = src.when.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' }) +
-                 ' · ' + src.when.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
-    const foot = document.createElement('div');
-    foot.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid ' + C.line + ';padding-top:12px;';
-    const left = document.createElement('span');
-    left.textContent = appName;
-    left.style.cssText = 'font-family:Sora,sans-serif;font-weight:700;font-size:12.5px;color:' + accent;
-    const right = document.createElement('span');
-    right.textContent = when;
-    right.style.cssText = 'font-size:11px;color:' + C.dim;
-    foot.appendChild(left); foot.appendChild(right);
-    box.appendChild(foot);
+    model.accent    = hexToRgb(src.accentHex) || [0, 126, 167];
+    model.footLeft  = appName;
+    model.footRight = src.when.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' }) +
+                      ' \u00b7 ' + src.when.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+    return model;
+  }
 
-    // solid page-coloured margin around the rounded card (a transparent one showed black in some apps, and WhatsApp offered "sticker")
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:fixed;left:-10000px;top:0;width:' + CARD_W + 'px;box-sizing:border-box;' +
-                         'padding:16px;background:' + C.page + ';font-family:Inter,sans-serif;color:' + C.text + ';';
-    wrap.appendChild(box);
-    return { wrap: wrap, accent: accent, accentText: src.accentText };
+  // ---------- drawing the image: Web Worker (own CPU core), or the same code on the main thread as a fallback ----------
+  const WORKER_URL   = 'js/share-card.js';
+  const WORKER_LIMIT = 12000;   // ms; if the worker takes longer than this (or fails) the main-thread fallback is used
+  let worker = null, workerBroken = false, jobId = 0;
+  const jobs = new Map();
+
+  function renderOpts(){
+    const url = p => new URL(p, document.baseURI).href;
+    return { type: IMAGE_TYPE, quality: JPG_QUALITY,
+             fonts: { ui: url('fonts/inter-latin-wght-normal.woff2'), head: url('fonts/sora-latin-wght-normal.woff2') } };
+  }
+  function failJobs(err){ jobs.forEach(j => { clearTimeout(j.t); j.rej(err); }); jobs.clear(); }
+  function getWorker(){
+    if(worker) return worker;
+    worker = new Worker(new URL(WORKER_URL, document.baseURI));
+    worker.onmessage = e => {
+      const j = jobs.get(e.data.id);
+      if(!j) return;
+      jobs.delete(e.data.id); clearTimeout(j.t);
+      if(e.data.ok) j.res(e.data); else j.rej(new Error(e.data.error));
+    };
+    worker.onerror = e => {
+      workerBroken = true;
+      try{ worker.terminate(); }catch(x){}
+      worker = null;
+      failJobs(new Error((e && e.message) || 'worker error'));
+    };
+    return worker;
+  }
+  function renderInWorker(model){
+    return new Promise((res, rej) => {
+      const id = ++jobId;
+      const t = setTimeout(() => { jobs.delete(id); workerBroken = true; rej(new Error('worker timed out')); }, WORKER_LIMIT);
+      jobs.set(id, { res: res, rej: rej, t: t });
+      try{ getWorker().postMessage({ id: id, model: model, opts: renderOpts() }); }
+      catch(err){ clearTimeout(t); jobs.delete(id); workerBroken = true; rej(err); }
+    });
+  }
+  let mainRendererP = null;
+  function renderOnMain(model){
+    if(!mainRendererP) mainRendererP = new Promise((res, rej) => {
+      if(window.renderShareCard) return res();
+      const sc = document.createElement('script');
+      sc.src = WORKER_URL; sc.onload = () => res(); sc.onerror = () => { mainRendererP = null; rej(new Error(WORKER_URL + ' could not be loaded')); };
+      document.head.appendChild(sc);
+    });
+    return mainRendererP.then(() => window.renderShareCard(model, renderOpts()));
+  }
+  async function renderCard(model){
+    let why = 'worker skipped (Worker: ' + typeof Worker + ', OffscreenCanvas: ' + typeof OffscreenCanvas + (workerBroken ? ', marked broken' : '') + ')';
+    if(!workerBroken && typeof Worker !== 'undefined' && typeof OffscreenCanvas !== 'undefined'){
+      try{ const w = await renderInWorker(model); w.via = 'worker'; return w; }
+      catch(err){ why = 'worker: ' + ((err && err.message) || err); console.warn('Share image: worker failed, drawing on the main thread instead.', err); }
+    }
+    try{ const m = await renderOnMain(model); m.via = 'main thread, because ' + why; return m; }
+    catch(err){ throw new Error(why + ' | main: ' + ((err && err.message) || err)); }
   }
 
   // ---------- the popup (static #shareModal in index.html; js/popups.js animates .show on/off) ----------
@@ -270,9 +329,8 @@
     }
     function canCopy(){ return !!(navigator.clipboard && window.ClipboardItem); }
     async function copyImage(){
-      // clipboard only accepts PNG: reuse the image if it already is one, otherwise make a PNG from the canvas
-      const png = o.blob.type === 'image/png' ? Promise.resolve(o.blob)
-                                              : new Promise(res => o.canvas.toBlob(res, 'image/png'));
+      // clipboard only accepts PNG: reuse the image if it already is one, otherwise use the PNG the worker made for this
+      const png = o.blob.type === 'image/png' ? o.blob : o.pngBlob;
       await navigator.clipboard.write([ new ClipboardItem({ 'image/png': png }) ]);
     }
 
@@ -334,30 +392,25 @@
   const building = new Map();    // key -> an image being built right now (so two requests never build it twice)
 
   function cacheKey(appName, src){
-    return appName + '|' + src.accentHex + '|' + src.when.getTime() + '|' + src.box.innerHTML;   // must be read BEFORE buildCard changes the box
+    return appName + '|' + src.accentHex + '|' + src.when.getTime() + '|' + src.box.innerHTML;   // read from the card as it is on screen
   }
 
   async function buildImage(appName, src){
-    const built = buildCard(appName, src);
-    document.body.appendChild(built.wrap);
-    try{
-      if(document.fonts && document.fonts.ready) await document.fonts.ready;   // so Sora/Inter are used, not fallbacks
-      const canvas = await html2canvas(built.wrap, { scale: SCALE, backgroundColor: C.page, useCORS: true, logging: false });
-      const blob = await new Promise(res => canvas.toBlob(res, IMAGE_TYPE, JPG_QUALITY));
-      if(!blob) throw new Error('could not create image');
-      const fileName = slug(appName) + '-result.' + IMAGE_EXT;
-      const file = new File([blob], fileName, { type: IMAGE_TYPE });
-      const url = URL.createObjectURL(blob);   // made once per image; freed when the image is dropped from the cache
-      return { url: url, canvas: IMAGE_TYPE === 'image/png' ? null : canvas,   // the canvas is only needed for Copy when the image isn't a PNG
-               blob: blob, file: file, fileName: fileName, appName: appName,
-               accent: built.accent, accentText: built.accentText };
-    } finally {
-      built.wrap.remove();
-    }
+    const model = buildModel(appName, src);
+    const t0    = performance.now();
+    const out   = await renderCard(model);
+    const blob  = out.blob;
+    if(!blob) throw new Error('could not create image');
+    const fileName = slug(appName) + '-result.' + IMAGE_EXT;
+    const file = new File([blob], fileName, { type: IMAGE_TYPE });
+    const url = URL.createObjectURL(blob);   // made once per image; freed when the image is dropped from the cache
+    return { url: url, pngBlob: out.png || null,   // pngBlob is only set when the image isn't a PNG (Copy needs a PNG)
+             blob: blob, file: file, fileName: fileName, appName: appName,
+             accent: 'rgb(' + model.accent.join(',') + ')', accentText: src.accentText,
+             info: 'drawn via ' + out.via + ' in ' + Math.round(performance.now() - t0) + 'ms' };
   }
 
   function getImage(appName, src){
-    if(typeof html2canvas !== 'function') return Promise.reject(new Error('html2canvas not loaded'));
     const key = cacheKey(appName, src);
     if(cache.has(key)) return Promise.resolve(cache.get(key));
     if(building.has(key)) return building.get(key);
@@ -383,7 +436,8 @@
 
   // TEMPORARY: shows a small timing note at the top of the screen after each Share tap (set to false / delete when done testing)
   const DEBUG_TIMING = false;
-  function debugNote(text){
+  const SHOW_ERRORS  = false;  // true = black on-screen note: how/how fast the image was drawn (worker or main thread) + the real reason if Share fails
+  function debugNote(text, ms){
     let d = document.getElementById('shareDebugNote');
     if(!d){
       d = document.createElement('div'); d.id = 'shareDebugNote';
@@ -391,7 +445,7 @@
       document.body.appendChild(d);
     }
     d.textContent = text; d.style.display = 'block';
-    clearTimeout(d._t); d._t = setTimeout(() => { d.style.display = 'none'; }, 8000);
+    clearTimeout(d._t); d._t = setTimeout(() => { d.style.display = 'none'; }, ms || 8000);
   }
 
   // ---------- main ----------
@@ -415,6 +469,7 @@
       }
       const img = await getImage(appName, src);
       const t1 = performance.now();
+      if(SHOW_ERRORS) debugNote('Share image ' + img.info + (wasCached ? ' (pre-built)' : ''), 15000);
       openPreview(img);
       if(DEBUG_TIMING) requestAnimationFrame(() => requestAnimationFrame(() => {
         const t2 = performance.now();
@@ -424,6 +479,7 @@
       if(textBtn) btn.textContent = original;
     }catch(err){
       console.error('Share failed:', err);
+      if(SHOW_ERRORS) debugNote('SHARE ERROR: ' + ((err && err.message) || err), 30000);
       if(textBtn){
         btn.textContent = 'Couldn\u2019t share';
         setTimeout(() => { btn.textContent = original; }, 2000);

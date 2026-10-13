@@ -1,132 +1,172 @@
+/* confetti.js
+   Starts the confetti. The actual drawing is done by js/confetti-worker.js,
+   which runs on its own thread so the page doesn't stutter.
+   If the browser can't run a worker (or the app is opened straight from a
+   file), the same drawing code runs on the main page instead.
+   game.js only calls window.fireConfetti(), nothing else. */
 (function () {
-  var COLORS = ['#e84b5e', '#f9db05', '#009bff', '#48ff24'];
-  var GRAVITY = 3;
-  var MAX_TICKS = 600;        // safety limit, so the canvas always gets removed
+  var WORKER_URL = 'js/confetti-worker.js';
+  var SAFETY_MS = 15000;          // remove the canvas after this long no matter what
 
-  // Each piece vanishes when it falls below its own height on the screen
-  // (0 = top, 1 = bottom). Different heights make them disappear gradually.
-  var VANISH_MIN = 0.75;
-  var VANISH_MAX = 0.93;
-  var FADE_PX = 95;           // how far a piece fades out after reaching its height
+  // DEBUG: set to true to see a small black note at the bottom of the screen
+  // every time confetti fires. It says "worker" (the new way) or
+  // "main thread, because ..." (the older way, with the reason). Keep it false.
+  var SHOW_ERRORS = false;
 
-  // Desktop only (screens wider than 640px)
-  var DESKTOP_DENSITY = 2;    // 2 = twice as many pieces
-  var PHONE_DENSITY = 2;    // 1.5 = half again as many pieces
-  var DESKTOP_SPEED = 1.6;    // 1.6 = travels further
+  var worker = null;
+  var workerBroken = false;
+  var brokenReason = '';
+  var nextId = 1;
+  var active = {};                // id -> { canvas, timer, opts }
+  var fallbackLoading = false;
+  var fallbackQueue = [];
 
-  function fireConfetti() {
-    var W = window.innerWidth;
-    var H = window.innerHeight;
-    var isPhone = window.matchMedia('(max-width:640px)').matches;
-    var density = isPhone ? PHONE_DENSITY : DESKTOP_DENSITY;
-    var speed = isPhone ? 1 : DESKTOP_SPEED;
+  function note(text) {
+    if (!SHOW_ERRORS) return;
+    var el = document.getElementById('confettiDebugNote');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'confettiDebugNote';
+      el.style.cssText = 'position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));' +
+        'z-index:10000;background:#000;color:#fff;font:12px/1.4 monospace;padding:8px 10px;' +
+        'border-radius:8px;pointer-events:none;word-break:break-word';
+      document.body.appendChild(el);
+    }
+    el.textContent = 'confetti: ' + text;
+    clearTimeout(el._t);
+    el._t = setTimeout(function () { if (el.parentNode) el.remove(); }, 6000);
+  }
 
+  function breakWorker(reason) {
+    workerBroken = true;
+    brokenReason = reason;
+  }
+
+  // Returns '' if a worker can be used, otherwise the reason it can't
+  function workerProblem() {
+    if (workerBroken) return brokenReason || 'worker failed earlier';
+    if (typeof Worker === 'undefined') return 'this browser has no Worker support';
+    if (typeof OffscreenCanvas === 'undefined') return 'this browser has no OffscreenCanvas';
+    if (typeof HTMLCanvasElement === 'undefined' || !('transferControlToOffscreen' in HTMLCanvasElement.prototype)) {
+      return 'this browser can\'t hand a canvas to a worker';
+    }
+    return '';
+  }
+
+  function makeCanvas() {
     var canvas = document.createElement('canvas');
     canvas.setAttribute('aria-hidden', 'true');
     canvas.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:9999';
     document.body.appendChild(canvas);
+    return canvas;
+  }
 
-    var dpr = window.devicePixelRatio || 1;
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
-    var ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  function finish(id) {
+    var item = active[id];
+    if (!item) return;
+    clearTimeout(item.timer);
+    if (item.canvas.parentNode) item.canvas.remove();
+    delete active[id];
+  }
 
-    var pieces = [];
+  // The worker failed for this round: draw it on the main page instead.
+  function rescue(id) {
+    var item = active[id];
+    if (!item) return;
+    var opts = item.opts;
+    finish(id);
+    startOnMain(opts, brokenReason || 'the worker failed');
+  }
 
-    function fire(count, o) {
-      count = Math.round(count * density);
-      var originX = (o.x === undefined ? 0.5 : o.x) * W;
-      var originY = (o.y === undefined ? 0.7 : o.y) * H;
-      var angle = (o.angle === undefined ? 90 : o.angle) * Math.PI / 180;
-      var spread = (o.spread === undefined ? 45 : o.spread) * Math.PI / 180;
-      var startVelocity = (o.startVelocity === undefined ? 45 : o.startVelocity) * speed;
-      var decay = o.decay === undefined ? 0.9 : o.decay;
-      var scalar = o.scalar === undefined ? 1 : o.scalar;
-
-      for (var i = 0; i < count; i++) {
-        pieces.push({
-          x: originX,
-          y: originY,
-          angle2D: -angle + (0.5 * spread - Math.random() * spread),
-          vel: startVelocity * 0.5 + Math.random() * startVelocity,
-          decay: decay,
-          w: (9 + Math.random() * 4) * scalar,
-          h: (5 + Math.random() * 3) * scalar,
-          rot: Math.random() * Math.PI * 2,
-          vr: (Math.random() - 0.5) * 0.3,
-          wobble: Math.random() * 10,
-          vanishY: H * (VANISH_MIN + Math.random() * (VANISH_MAX - VANISH_MIN)),
-          tick: 0,
-          dead: false,
-          falling: false,
-          color: COLORS[Math.floor(Math.random() * COLORS.length)]
-        });
-      }
+  function getWorker() {
+    if (worker) return worker;
+    try {
+      worker = new Worker(WORKER_URL);
+    } catch (err) {
+      breakWorker('the worker could not start (' + (err && err.name ? err.name : 'error') + ')');
+      return null;
     }
+    worker.onmessage = function (e) {
+      var m = e.data || {};
+      if (m.type === 'done') finish(m.id);
+      else if (m.type === 'failed') { breakWorker('the worker hit an error while drawing'); rescue(m.id); }
+    };
+    worker.onerror = function () {
+      breakWorker('the worker file failed to load or crashed');
+      worker = null;
+      Object.keys(active).forEach(rescue);
+    };
+    return worker;
+  }
 
-    var total = 200;
-
-    // Centre bursts (desktop only)
-    if (!isPhone) {
-      fire(total * 0.25, { spread: 26, startVelocity: 55 });
-      fire(total * 0.2,  { spread: 60 });
-      fire(total * 0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
-      fire(total * 0.1,  { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
-      fire(total * 0.1,  { spread: 120, startVelocity: 45 });
+  function startInWorker(opts) {
+    var w = getWorker();
+    if (!w) return false;
+    var canvas = makeCanvas();
+    var off;
+    try {
+      off = canvas.transferControlToOffscreen();
+    } catch (err) {
+      canvas.remove();
+      breakWorker('the canvas could not be handed to the worker');
+      return false;
     }
-
-    // Side sprays (phone and desktop)
-    fire(70, { x: 0, y: 0.7, angle: 60,  spread: 55, startVelocity: 60 });
-    fire(70, { x: 1, y: 0.7, angle: 120, spread: 55, startVelocity: 60 });
-
-    var last = performance.now();
-
-    function frame(now) {
-      var dt = Math.min((now - last) / 16.667, 3);
-      last = now;
-      ctx.clearRect(0, 0, W, H);
-
-      var alive = 0;
-      for (var i = 0; i < pieces.length; i++) {
-        var p = pieces[i];
-        if (p.dead) continue;
-
-        p.vel *= Math.pow(p.decay, dt);
-        p.x += Math.cos(p.angle2D) * p.vel * dt;
-        var vy = Math.sin(p.angle2D) * p.vel + GRAVITY;
-        p.y += vy * dt;
-        if (vy > 0) p.falling = true;
-        p.rot += p.vr * dt;
-        p.tick += dt;
-
-        var alpha = 1;
-        if (p.falling && p.y > p.vanishY) alpha = 1 - (p.y - p.vanishY) / FADE_PX;
-        if (alpha <= 0 || p.tick > MAX_TICKS) { p.dead = true; continue; }
-        alive++;
-
-        var flutter = Math.abs(Math.cos(p.wobble + p.tick * 0.2)) * 0.7 + 0.3;
-
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rot);
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = p.color;
-        ctx.fillRect(-p.w / 2, (-p.h * flutter) / 2, p.w, p.h * flutter);
-        ctx.restore();
-      }
-
-      if (alive > 0) {
-        requestAnimationFrame(frame);
-      } else {
-        canvas.remove();
-      }
+    var id = nextId++;
+    active[id] = { canvas: canvas, opts: opts, timer: setTimeout(function () { finish(id); }, SAFETY_MS) };
+    try {
+      w.postMessage({ type: 'fire', id: id, canvas: off, W: opts.W, H: opts.H, dpr: opts.dpr, isPhone: opts.isPhone }, [off]);
+    } catch (err) {
+      finish(id);
+      breakWorker('sending the canvas to the worker failed');
+      return false;
     }
+    return true;
+  }
 
-    requestAnimationFrame(frame);
+  // Fallback: load the same file as a normal script and draw on the main page
+  function withFallbackScript(cb) {
+    if (typeof window.runConfetti === 'function') { cb(); return; }
+    fallbackQueue.push(cb);
+    if (fallbackLoading) return;
+    fallbackLoading = true;
+    var s = document.createElement('script');
+    s.src = WORKER_URL;
+    s.onload = function () {
+      var q = fallbackQueue; fallbackQueue = [];
+      q.forEach(function (fn) { fn(); });
+    };
+    s.onerror = function () {   // confetti is only decoration, so just give up quietly
+      fallbackQueue = [];
+      fallbackLoading = false;
+      note('could not load ' + WORKER_URL + ' (is it in sw.js ASSETS?)');
+    };
+    document.head.appendChild(s);
+  }
+
+  function startOnMain(opts, reason) {
+    note('main thread, because ' + reason);
+    withFallbackScript(function () {
+      var canvas = makeCanvas();
+      window.runConfetti(canvas, opts, function () { canvas.remove(); });
+    });
+  }
+
+  function fireConfetti() {
+    var opts = {
+      W: window.innerWidth,
+      H: window.innerHeight,
+      dpr: Math.min(window.devicePixelRatio || 1, 1.5),
+      isPhone: window.matchMedia('(max-width:640px)').matches
+    };
+    var problem = workerProblem();
+    if (!problem && startInWorker(opts)) { note('worker'); return; }
+    startOnMain(opts, problem || brokenReason || 'the worker could not be used');
   }
 
   window.fireConfetti = fireConfetti;
+
+  // Start the worker a moment after load, so the first confetti has no start-up delay
+  if (!workerProblem()) setTimeout(getWorker, 1500);
 })();
 
 // TEST ONLY: remove the two slashes at the start of the next line to make every tap fire confetti.
