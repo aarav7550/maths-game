@@ -440,7 +440,9 @@ function finishRound(){
   document.getElementById('resAvg').textContent = avgTime.toFixed(1) + 's';
   document.getElementById('resBest').textContent = bestTime.toFixed(1) + 's';
   const resName = getDisplayName();   // '' when no name is set
-  document.getElementById('resultsTitle').textContent =
+  // Title + line under it now come together from js/endmessages.js (see showEndMessage below).
+  // Fallback only if that file is missing:
+  if(typeof window.showEndMessage !== 'function') document.getElementById('resultsTitle').textContent =
     (accuracy === 100 ? 'Flawless round' : (accuracy >= 80 ? 'Solid round' : 'Round complete')) + (resName ? ', ' + resName : '');
 
   // Results page picks up the played skill's accent colour (Mixed uses the neutral primary blue)
@@ -467,6 +469,8 @@ function finishRound(){
     practice: state.practiceMode,
     details: buildSessionDetails(state.records)   // wrong + slowest questions, shown when you tap the session in History
   };
+
+  if(typeof window.showEndMessage === 'function') window.showEndMessage(accuracy, sessionRecord.date);   // title + line under it (js/endmessages.js); the date makes History show the same one
 
   if(state.practiceMode){
     practiceSessions.push(sessionRecord);

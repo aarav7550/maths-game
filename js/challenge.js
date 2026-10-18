@@ -51,7 +51,8 @@
   // ---------- draft state (never touches the player's own saved settings) ----------
   let selected = new Set();
   let config = {};
-  let questionCount = 15;
+  let questionCount = 15;   // the count shown / played
+  let wantedCount = 15;     // what the player asked for; the shown count is this capped by what the ranges allow (so it can grow back)
   let mode = 'challenge';       // 'challenge' = Create a challenge (code + Start)   'mixed' = Mixed drill (Start only)
   let draftSeed = randomSeed(); // one seed per opening of the screen, so a code you generate and the round you Start are the SAME questions
 
@@ -88,10 +89,10 @@
       const saved = skillConfig[k] || DEFAULT_CONFIG[k];
       config[k] = {
         level: 'easy',
-        custom: { min: saved.min, max: saved.max, parity: saved.parity || 'any', count: saved.count || 2 }
+        custom: { min: saved.min, max: saved.max, parity: getCustomParity(k), count: saved.count || 2, mode: saved.mode || 'fwd' }
       };
     });
-    questionCount = 15;
+    questionCount = wantedCount = 15;
   }
 
   // ---------- per-skill settings cards ----------
@@ -121,7 +122,15 @@
         </div>
       </div>`;
 
-    if(!isAdd){
+    const modeOpts = SKILL_MODE_OPTIONS[skillId];   // e.g. Reciprocals: a Direction control instead of Even/Odd
+    if(modeOpts){
+      const cur = modeOpts[Math.max(0, modeOpts.findIndex(o => o.v === c.custom.mode))];
+      rows += `
+      <div class="cc-config-row">
+        <label>${SKILL_META[skillId].modeLabel || 'Mode'}</label>
+        ${directionSwapHtml(modeOpts, cur)}
+      </div>`;
+    } else if(!isAdd){
       rows += `
       <div class="cc-config-row">
         <label>Type</label>
@@ -221,6 +230,13 @@
       parityBtn.classList.add('active');
       config[skillId].custom.parity = parityBtn.dataset.v;
       updateFooter();
+      return;
+    }
+
+    const swapBtn = e.target.closest('.dir-swap');
+    if(swapBtn){
+      config[skillId].custom.mode = flipDirectionButton(swapBtn, skillId);
+      updateFooter();   // the time estimate depends on the direction (different timers)
       return;
     }
 
@@ -336,7 +352,7 @@
         qcountBar.classList.add('custom-active');
         qcountInline.focus();
         hideBarWhileEditing(qcountInline);
-        if(qcountInline.value) questionCount = parseInt(qcountInline.value, 10) || questionCount;
+        if(qcountInline.value){ questionCount = parseInt(qcountInline.value, 10) || questionCount; wantedCount = questionCount; }
         updateFooter();
         return;
       }
@@ -344,7 +360,7 @@
       qcountCustomBtn.classList.remove('expanded');
       qcountBar.classList.remove('custom-active');
       opt.classList.add('active');
-      questionCount = parseInt(opt.dataset.n, 10);
+      questionCount = wantedCount = parseInt(opt.dataset.n, 10);
       updateFooter();
     });
   });
@@ -353,7 +369,7 @@
     let v = parseInt(qcountInline.value, 10);
     const max = maxQuestionsAllowed();
     if(v > max){ v = max; qcountInline.value = max; }
-    if(v > 0){ questionCount = v; updateFooter(); }
+    if(v > 0){ questionCount = wantedCount = v; updateFooter(); }
   });
 
   // ---------- bottom bar: summary + Generate ----------
@@ -366,6 +382,8 @@
     return SKILL_ORDER_LOCAL.some(k => {
       if(!selected.has(k) || config[k].level !== 'custom') return false;
       const { min, max } = config[k].custom;
+      const lim = SKILL_RANGE_LIMIT[k];   // e.g. Reciprocals must stay inside 1-30
+      if(lim && Number.isFinite(min) && Number.isFinite(max) && (min < lim.min || max > lim.max)) return true;
       return !(Number.isFinite(min) && Number.isFinite(max) && min < max);   // same rule as the Difficulty popup
     });
   }
@@ -387,23 +405,30 @@
   function applyQcountLimits(){
     const max = maxQuestionsAllowed();
     const opts = [...qcountBar.querySelectorAll('.cc-qcount-opt')].filter(o => o !== qcountCustomBtn);
-    opts.forEach(o => { o.disabled = parseInt(o.dataset.n, 10) > max; });
+    // A custom range that can't start (min not below max, or outside the skill's limit) has no usable count:
+    // grey every preset out (same as a range that is too small) and leave the count alone until it is valid again.
+    const rangeInvalid = customIsInvalid();
+    opts.forEach(o => { o.disabled = rangeInvalid || parseInt(o.dataset.n, 10) > max; });
     qcountInline.max = Number.isFinite(max) ? max : '';
-    if(questionCount > max){
-      const ok = opts.filter(o => !o.disabled).pop();
-      qcountBar.querySelectorAll('.cc-qcount-opt').forEach(o => o.classList.remove('active'));
-      if(ok){
-        ok.classList.add('active');
-        qcountCustomBtn.classList.remove('expanded');
-        qcountBar.classList.remove('custom-active');
-        questionCount = parseInt(ok.dataset.n, 10);
-      } else {
-        qcountCustomBtn.classList.add('active', 'expanded');
-        qcountBar.classList.add('custom-active');
-        qcountInline.value = max;
-        questionCount = max;
-      }
+    if(rangeInvalid) return;
+    const target = Math.max(1, Math.min(wantedCount, max));
+    if(target !== questionCount) showCount(target);   // shrinks and re-expands with the ranges
+  }
+
+  // Shows a count in the bar: the matching preset button if there is one, else the custom box.
+  function showCount(n){
+    const opts = [...qcountBar.querySelectorAll('.cc-qcount-opt')];
+    opts.forEach(o => o.classList.remove('active', 'expanded'));
+    qcountBar.classList.remove('custom-active');
+    const preset = opts.find(o => o !== qcountCustomBtn && parseInt(o.dataset.n, 10) === n);
+    if(preset){
+      preset.classList.add('active');
+    } else {
+      qcountCustomBtn.classList.add('active', 'expanded');
+      qcountBar.classList.add('custom-active');
+      qcountInline.value = n;
     }
+    questionCount = n;
   }
 
   function updateFooter(){
@@ -422,7 +447,9 @@
       return;
     }
     if(invalid){
-      blockedMsg.textContent = 'Enter a valid min and max for each custom skill (min below max).';
+      const limits = SKILL_ORDER_LOCAL.filter(k => selected.has(k) && config[k].level === 'custom' && SKILL_RANGE_LIMIT[k])
+        .map(k => ' ' + skillDisplayLabels[k] + ' must stay within ' + SKILL_RANGE_LIMIT[k].min + '–' + SKILL_RANGE_LIMIT[k].max + '.').join('');
+      blockedMsg.textContent = 'Enter a valid min and max for each custom skill (min below max).' + limits;
       blockedMsg.classList.add('show');
     } else {
       blockedMsg.classList.remove('show');
@@ -443,8 +470,10 @@
     const c = config[skillId];
     const isAdd = SKILL_HAS_COUNT[skillId];
     if(c.level === 'custom'){
-      const out = { min: c.custom.min, max: c.custom.max, parity: isAdd ? 'any' : c.custom.parity };
+      const modeOpts = SKILL_MODE_OPTIONS[skillId];
+      const out = { min: c.custom.min, max: c.custom.max, parity: (isAdd || modeOpts) ? 'any' : c.custom.parity };
       if(isAdd) out.count = c.custom.count || 2;
+      if(modeOpts) out.mode = c.custom.mode || modeOpts[0].v;
       return out;
     }
     const p = DIFFICULTY_PRESETS[skillId][c.level];

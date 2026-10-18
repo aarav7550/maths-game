@@ -99,11 +99,19 @@
     return null;
   }
 
+  function titleOf(box){
+    const t = box.querySelector('.title');
+    if(!t) return '';
+    return squash(t.hasAttribute('data-share-text') ? t.getAttribute('data-share-text') : t.textContent);
+  }
+
   function extractCard(box){
     const noteEl = box.querySelector('.config-note');
+    const msgEl  = box.querySelector('.end-msg');   // end-of-round message; data-share-text is the plain version (no "set a name" button)
     const kinds  = ['acc', 'avg', 'best'];   // stat boxes are always accuracy, avg time, best time (used if the s-* classes are missing)
     return {
-      title: textIn(box, '.title'),
+      title: titleOf(box),   // data-share-text is the plain version (no "set a name" button)
+      message: msgEl ? squash(msgEl.hasAttribute('data-share-text') ? msgEl.getAttribute('data-share-text') : msgEl.textContent) : '',
       note:  noteEl ? runsOf(noteEl, false, [[]]) : [],
       stats: Array.from(box.querySelectorAll('.stat-box')).map((b, i) => ({
         num: textIn(b, '.num'), lbl: textIn(b, '.lbl'),
@@ -161,10 +169,14 @@
 
     const num   = v => (typeof v === 'number' && isFinite(v)) ? v.toFixed(1) + 's' : '—';   // best time may be missing -> dash
     const who   = (typeof getDisplayName === 'function') ? getDisplayName() : '';   // current name ('' if not set); rounds don't save a name
-    const title = (rec.accuracy === 100 ? 'Flawless round' : (rec.accuracy >= 80 ? 'Solid round' : 'Round complete')) + (who ? ', ' + esc(who) : '');   // same rule as game.js
+    // title + line come as a pair from js/endmessages.js, picked from the round's date (same pair the Results screen showed)
+    const pair = (typeof window.pickEndMessage === 'function') ? window.pickEndMessage(rec.accuracy, who, rec.date) : null;
+    const title  = pair ? pair.title : ((rec.accuracy === 100 ? 'Flawless round' : (rec.accuracy >= 80 ? 'Solid round' : 'Round complete')) + (who ? ', ' + who : ''));   // old rule, only if endmessages.js is missing
+    const endMsg = pair ? pair.message : '';
 
     let html =
-      '<div class="title">' + title + '</div>' +
+      '<div class="title" data-share-text="' + esc(title) + '">' + esc(title) + '</div>' +
+      '<div class="end-msg" data-share-text="' + esc(endMsg) + '"></div>' +
       '<div class="config-note">' + parts.join('<br>') + '</div>' +
       '<div class="stats-grid">' +
         '<div class="stat-box s-acc"><div class="num">' + esc(rec.accuracy) + '%</div><div class="lbl">accuracy</div></div>' +

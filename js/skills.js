@@ -33,6 +33,12 @@ const RECIPROCALS = {
 };
 
 // ---------- skill generators ----------
+// Tables 10 and 11 are the easy ones, so they come up less: when one of them is drawn as the first number it is only
+// kept this often (0.5 = half as likely as any other number). Add / remove numbers or change the 0.5 to taste.
+// Careful: each time this triggers it uses one more random number, so an OLD Tables challenge code that includes
+// 10 or 11 gives different questions than it did before this change.
+const TABLE_EASY_KEEP = { 10: 0.5, 11: 0.5 };
+
 const SKILLS = {
   half: {
     hasDecimals: true,   // odd numbers give answers like 241.5 (drives the one-time hint popup)
@@ -122,7 +128,7 @@ const SKILLS = {
         n = randInt(2, 9);
         key = x + 'x' + n;
         attempts++;
-      } while(used.has(key) && attempts < 50);
+      } while((used.has(key) || (TABLE_EASY_KEEP[x] !== undefined && rng() >= TABLE_EASY_KEEP[x])) && attempts < 50);
       used.add(key);
       return { text: `${x} × ${n}`, answer: x*n };
     }

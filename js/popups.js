@@ -22,7 +22,7 @@
   const OVERLAY_IDS = ['diffModalOverlay','mixedSoonModal','nameOverlay','exitModal','challengeShowModal','challengeEnterModal','shortcutHintModal','shortcutsModal','reviewModal','signHintModal','shareModal'];
   // only these popups grow from the tapped element; the rest pop from the centre
   const ORIGIN_OVERLAYS = new Set(['diffModalOverlay','mixedSoonModal','nameOverlay']);
-  const ORIGIN_SELECTOR = '.skill-card:not(.soon), #btnMixedStart, #greetName, #dgreetName';
+  const ORIGIN_SELECTOR = '.skill-card:not(.soon), #btnMixedStart, #greetName, #dgreetName, .res-name-set';
 
   const overlays = OVERLAY_IDS.map(id => document.getElementById(id)).filter(Boolean);
   const originOf = new Map();   // overlay -> element it grew from

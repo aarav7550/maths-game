@@ -708,6 +708,19 @@
     background:#FFFFFF; border:1px solid var(--r-accent-tint-border); border-radius:16px; padding:22px;
   }
   #view-results .title{ font-family:'Sora',sans-serif; font-size:19px; font-weight:700; margin-bottom:8px; color:var(--r-text); }
+  #view-results .end-msg{ font-size:14px; font-weight:500; line-height:1.5; color:var(--r-dim); margin-bottom:12px; }
+  #view-results .end-msg:empty{ display:none; }
+  /* "set a name" button inside the message (same look as Home's). Kept out of the share image: share.js reads data-share-text instead. */
+  #view-results .res-name-set{
+    display:inline-flex; align-items:center; gap:6px; vertical-align:baseline;
+    background:none; border:1px dashed #B9CDD6; border-radius:8px; padding:1px 8px; margin:0 1px;
+    font-family:inherit; font-size:12.5px; font-weight:600; line-height:1.4; color:var(--r-dim);
+    cursor:pointer; -webkit-tap-highlight-color:transparent;
+  }
+  /* same button when it sits in the (Sora, bold) title: keep it Inter and small, lifted a little to line up with the big text */
+  #view-results .title .res-name-set{ font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; vertical-align:3px; }
+  #view-results .res-name-set svg{ width:12px; height:12px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  @media (hover:hover){ #view-results .res-name-set:hover{ color:var(--r-text); border-color:var(--r-dim); } }
   #view-results .config-note{
     font-size:12.5px; color:var(--r-dim); line-height:1.6;
     background:var(--r-accent-tint); border:1px solid var(--r-accent-tint-border);
@@ -1883,3 +1896,32 @@
   .share-modal-box{ max-width:420px; }
   .share-modal-imgwrap{ max-height:calc(100vh - 180px); }
 }
+
+/* ============================================================
+   Direction swap button (Reciprocals' Custom editor)
+   One button:  [ Fraction ]  <swap icon>  [ Percentage ]   (phones show % instead of Percentage)
+   Left = what you get, right = what you type. Tapping swaps the two and spins the icon.
+   Used in the Difficulty popup (.config-row) and the Create screen (.cc-config-row).
+   Looks like that screen's range boxes (same width, border, corners, padding); --sc is the skill colour.
+   ============================================================ */
+.dir-swap{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  width:100%; min-width:0; box-sizing:border-box;
+  padding:10px 8px;
+  background:var(--card); border:1.5px solid var(--line); border-radius:10px;
+  color:var(--ink); font-family:'Sora',sans-serif; font-size:13px; font-weight:700; line-height:1.2;
+  cursor:pointer; -webkit-tap-highlight-color:transparent;
+  transition:border-color .12s ease, transform .12s ease;
+}
+#view-challenge .dir-swap{ background:var(--bg); border-width:1px; border-radius:8px; padding:9px 6px; font-family:inherit; font-size:13.5px; }
+.dir-swap .dir-end{ flex:1 1 0; min-width:0; text-align:center; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dir-swap .dir-swap-icon{ flex:0 0 18px; width:18px; height:18px; transition:transform .28s ease; }
+.dir-swap .dir-swap-icon path{ stroke:var(--sc, var(--primary)); }   /* explicit stroke, not inherited */
+.dir-swap[data-i="1"] .dir-swap-icon{ transform:rotate(180deg); }   /* the icon is point-symmetric, so it spins and lands looking the same */
+.dir-swap:active{ transform:scale(.98); }
+.dir-swap:focus-visible{ outline:none; border-color:var(--sc, var(--primary)); }
+@media (hover:hover){ .dir-swap:hover{ border-color:var(--sc, var(--primary)); } }
+@media (prefers-reduced-motion: reduce){ .dir-swap .dir-swap-icon{ transition:none; } }
+/* words: desktop shows the full word, phones the short one (separate rule sets) */
+@media (min-width:641px){ .dir-swap .dir-short{ display:none; } }
+@media (max-width:640px){ .dir-swap .dir-long{ display:none; } }

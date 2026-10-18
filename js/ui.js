@@ -8,8 +8,11 @@
 // DIFFICULTY_PRESETS, DIFF_ORDER, NO_CUSTOM, CUSTOM_NOTE and the skill names/icons/colours
 // all come from SKILL_META in js/registry.js - add or change skills there.
 
-// Custom ranges have no preset of their own, so they borrow the Difficult level's timer.
+// Custom ranges have no preset of their own, so they borrow the timer of the level their range fits (see
+// customTimerSeconds). Bigger than the hardest level = the hardest level's timer + CUSTOM_OVER_TOP_BONUS_SECS.
+// CUSTOM_TIMER_LEVEL is only the fallback when a config is missing.
 const CUSTOM_TIMER_LEVEL = 'difficult';
+const CUSTOM_OVER_TOP_BONUS_SECS = 7;
 
 // ---------- more-options menu (About us / Report a bug) ----------
 const btnMoreMenu = document.getElementById('btnMoreMenu');
@@ -96,6 +99,7 @@ function closeNameEditor(){ nameOverlay.classList.remove('show'); nameInput.blur
 function commitName(){
   setDisplayName(nameInput.value);
   renderGreeting();
+  if(window.refreshEndMessage) window.refreshEndMessage();   // Results message: "set a name" button -> the name (js/endmessages.js)
   closeNameEditor();
 }
 greetName.addEventListener('click', openNameEditor);
@@ -258,6 +262,20 @@ document.getElementById('historyCard').addEventListener('click', () => {
 // Mixed drill strip: its Start button opens the Create screen in Mixed drill mode (wired in js/challenge.js).
 
 // ---------- Difficulty Picker ----------
+// Custom's Even/Odd choice per skill, remembered on its own. Playing a level always uses "any" and never touches it;
+// only the Custom editor (this popup and the Create screen) starts from it. Saved under its own key so it can't leak
+// into saved rounds or challenge codes.
+const CUSTOM_PARITY_KEY = KEY_PREFIX + 'game_custom_parity_v1';
+function loadCustomParities(){
+  try{ return JSON.parse(localStorage.getItem(CUSTOM_PARITY_KEY) || '{}') || {}; }catch(e){ return {}; }
+}
+function getCustomParity(skillKey){ return loadCustomParities()[skillKey] || 'any'; }
+function setCustomParity(skillKey, parity){
+  const all = loadCustomParities();
+  all[skillKey] = parity;
+  try{ localStorage.setItem(CUSTOM_PARITY_KEY, JSON.stringify(all)); }catch(e){}
+}
+
 const DIFF_LABELS = { veryeasy:'Very Easy', easy:'Easy', difficult:'Difficult', verydifficult:'Very Difficult', custom:'Custom' };
 const LEVEL_READY_MESSAGE = {
   veryeasy: 'Easing in, nice and steady.',
@@ -270,7 +288,9 @@ const LEVEL_READY_MESSAGE = {
 let CURRENT_SKILL = null;
 let pickerLevel = null; // 'veryeasy'|'easy'|'difficult'|'verydifficult'|'custom'|null — reset each open
 let pickerCustom = null; // deep copy of this skill's config, edited live if level === 'custom'
-let selectedQuestionCount = 15;
+let selectedQuestionCount = 15;   // the count shown / played
+let wantedQuestionCount = 15;     // what the player asked for. The shown count is this, capped by what the range allows,
+                                  // so it grows back when the range does (and stays put if they chose a small number on purpose)
 
 const diffModalOverlay = document.getElementById('diffModalOverlay');
 const diffModal = document.getElementById('diffModal');
@@ -282,6 +302,29 @@ const btnStartRound = document.getElementById('btnStartRound');
 const qcountBar = document.getElementById('qcountBar');
 const qcountCustomBtn = document.getElementById('qcountCustomBtn');
 const qcountInlineValue = document.getElementById('qcountInlineValue');
+
+// Direction swap button (Reciprocals' Custom editor): [from] <swap icon> [to]. Left = what you get, right = what you type.
+// Used by the Difficulty popup (below) and the Create screen (challenge.js). Styled in style.css (.dir-swap).
+const DIRECTION_SWAP_SVG = '<svg class="dir-swap-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">'
+  + '<path d="M21 7.5L8 7.5M21 7.5L16.6667 3M21 7.5L16.6667 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+  + '<path d="M4 16.5L17 16.5M4 16.5L8.33333 21M4 16.5L8.33333 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// One end of the button holds the full word (shown on desktop) and a short form (shown on phones). CSS picks one.
+function directionEndHtml(long, short){
+  return `<span class="dir-long">${long}</span><span class="dir-short">${short || long}</span>`;
+}
+function directionSwapHtml(opts, cur){
+  return `<button type="button" class="dir-swap" data-seg="mode" data-i="${opts.indexOf(cur)}" aria-label="Swap direction" title="Swap direction">`
+    + `<span class="dir-end dir-from">${directionEndHtml(cur.from, cur.fromShort)}</span>${DIRECTION_SWAP_SVG}<span class="dir-end dir-to">${directionEndHtml(cur.to, cur.toShort)}</span></button>`;
+}
+// Flips the swap button in place (no re-render) and returns the new mode value to store.
+function flipDirectionButton(btn, skillKey){
+  const opts = SKILL_MODE_OPTIONS[skillKey];
+  const next = (parseInt(btn.dataset.i, 10) + 1) % opts.length;
+  btn.dataset.i = next;
+  btn.querySelector('.dir-from').innerHTML = directionEndHtml(opts[next].from, opts[next].fromShort);
+  btn.querySelector('.dir-to').innerHTML = directionEndHtml(opts[next].to, opts[next].toShort);
+  return opts[next].v;
+}
 
 // Range label shown on each preset pill, built from the real DIFFICULTY_PRESETS.
 function presetLabel(skillKey, level){
@@ -323,7 +366,15 @@ function buildConfigCard(skillKey){
       </div>
     </div>`;
 
-  if(!isAdd){
+  const modeOpts = SKILL_MODE_OPTIONS[skillKey];   // e.g. Reciprocals: a Direction control instead of Even/Odd
+  if(modeOpts){
+    const cur = modeOpts[Math.max(0, modeOpts.findIndex(o => o.v === pickerCustom.mode))];
+    customRowsHtml += `
+    <div class="config-row">
+      <label>${SKILL_META[skillKey].modeLabel || 'Mode'}</label>
+      ${directionSwapHtml(modeOpts, cur)}
+    </div>`;
+  } else if(!isAdd){
     customRowsHtml += `
     <div class="config-row">
       <label>Type</label>
@@ -397,6 +448,8 @@ function isSelectionReady(){
   if(pickerLevel === 'custom'){
     const min = parseInt(pickerCustom.min, 10);
     const max = parseInt(pickerCustom.max, 10);
+    const lim = SKILL_RANGE_LIMIT[CURRENT_SKILL];   // e.g. Reciprocals must stay inside 1-30
+    if(lim && (min < lim.min || max > lim.max)) return false;
     return Number.isFinite(min) && Number.isFinite(max) && min < max;
   }
   return true;
@@ -406,7 +459,7 @@ function pickerMaxQuestions(){
   if(!pickerLevel){
     // No level picked yet: a count is only blocked if it is too big for EVERY level the skill offers
     // (e.g. Reciprocals can never reach 50). Skills with Custom stay open, since Custom has no cap.
-    if(!NO_CUSTOM[CURRENT_SKILL]) return Infinity;
+    if(!NO_CUSTOM[CURRENT_SKILL] && !SKILL_RANGE_LIMIT[CURRENT_SKILL]) return Infinity;
     return Math.max(...Object.values(DIFFICULTY_PRESETS[CURRENT_SKILL]).map(p =>
       questionPoolSize(CURRENT_SKILL, { min: p.min, max: p.max, parity: 'any' })));
   }
@@ -423,23 +476,14 @@ function pickerMaxQuestions(){
 function applyQcountLimits(){
   const max = pickerMaxQuestions();
   const opts = [...qcountBar.querySelectorAll('.qcount-opt')].filter(o => o !== qcountCustomBtn);
-  opts.forEach(o => { o.disabled = parseInt(o.dataset.n, 10) > max; });
+  // A custom range that can't start a round (min not below max, or outside the skill's limit) has no usable count:
+  // grey every preset out (same as a range that is too small) and leave the count alone until the range is valid again.
+  const rangeInvalid = pickerLevel === 'custom' && !isSelectionReady();
+  opts.forEach(o => { o.disabled = rangeInvalid || parseInt(o.dataset.n, 10) > max; });
   qcountInlineValue.max = Number.isFinite(max) ? max : '';
-  if(selectedQuestionCount > max){
-    const ok = opts.filter(o => !o.disabled).pop();   // largest preset that still fits
-    qcountBar.querySelectorAll('.qcount-opt').forEach(o => o.classList.remove('active'));
-    if(ok){
-      ok.classList.add('active');
-      qcountCustomBtn.classList.remove('expanded');
-      qcountBar.classList.remove('custom-active');
-      selectedQuestionCount = parseInt(ok.dataset.n, 10);
-    } else {                                           // even 15 is too many: fall back to the custom box
-      qcountCustomBtn.classList.add('active', 'expanded');
-      qcountBar.classList.add('custom-active');
-      qcountInlineValue.value = max;
-      selectedQuestionCount = max;
-    }
-  }
+  if(rangeInvalid) return;
+  const target = Math.max(1, Math.min(wantedQuestionCount, max));
+  if(target !== selectedQuestionCount) setQcountUI(target);   // shrinks and re-expands with the range
 }
 
 function updateStartStrip(){
@@ -448,7 +492,9 @@ function updateStartStrip(){
   if(!pickerLevel){
     dssSub.textContent = 'Pick a difficulty above to begin';
   } else if(pickerLevel === 'custom'){
-    dssSub.textContent = ready ? LEVEL_READY_MESSAGE.custom : 'Enter a valid min and max above';
+    const lim = SKILL_RANGE_LIMIT[CURRENT_SKILL];
+    dssSub.textContent = ready ? LEVEL_READY_MESSAGE.custom
+      : (lim ? `Enter a min and max from ${lim.min} to ${lim.max} (min below max)` : 'Enter a valid min and max above');
   } else {
     dssSub.textContent = LEVEL_READY_MESSAGE[pickerLevel];
   }
@@ -480,7 +526,8 @@ function openDifficultyPicker(skillKey){
     : DIFFICULTY_PRESETS[skillKey][savedLevel]);
   pickerLevel = savedIsValid ? savedLevel : null;
   pickerCustom = Object.assign({}, skillConfig[skillKey]); // start custom editor from saved config
-  selectedQuestionCount = getLastCount(skillKey) || 15;
+  if(pickerCustom.parity !== undefined) pickerCustom.parity = getCustomParity(skillKey);   // ...but Even/Odd comes from Custom's own memory, not from the last level played
+  selectedQuestionCount = wantedQuestionCount = getLastCount(skillKey) || 15;
   practiceCheckbox.checked = false; // opening never pre-ticks it, so a normal round is the default
 
   diffModal.style.setProperty('--sc', SKILL_COLOR[skillKey]);
@@ -553,6 +600,12 @@ diffCardMount.addEventListener('click', (e) => {
     return;
   }
 
+  const swapBtn = e.target.closest('.dir-swap');
+  if(swapBtn){
+    pickerCustom.mode = flipDirectionButton(swapBtn, CURRENT_SKILL);
+    return;
+  }
+
   const countBtn = e.target.closest('[data-seg="count"] button');
   if(countBtn){
     const seg = countBtn.closest('[data-seg="count"]');
@@ -613,6 +666,7 @@ qcountBar.querySelectorAll('.qcount-opt').forEach(opt => {
       qcountInlineValue.focus();
       if(qcountInlineValue.value){
         selectedQuestionCount = parseInt(qcountInlineValue.value, 10) || selectedQuestionCount;
+        wantedQuestionCount = selectedQuestionCount;
       }
       return;
     }
@@ -620,7 +674,7 @@ qcountBar.querySelectorAll('.qcount-opt').forEach(opt => {
     qcountCustomBtn.classList.remove('expanded');
     qcountBar.classList.remove('custom-active');
     opt.classList.add('active');
-    selectedQuestionCount = parseInt(opt.dataset.n, 10);
+    selectedQuestionCount = wantedQuestionCount = parseInt(opt.dataset.n, 10);
   });
 });
 qcountInlineValue.addEventListener('click', (e) => e.stopPropagation());
@@ -628,7 +682,7 @@ qcountInlineValue.addEventListener('input', () => {
   let v = parseInt(qcountInlineValue.value, 10);
   const max = pickerMaxQuestions();
   if(v > max){ v = max; qcountInlineValue.value = max; }
-  if(v > 0) selectedQuestionCount = v;
+  if(v > 0) selectedQuestionCount = wantedQuestionCount = v;
 });
 
 // ---------- info-note popovers (clamped to modal bounds) ----------
@@ -673,18 +727,14 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Bring focused number fields into view above the mobile keyboard — modal itself scrolls
-// (it has overflow-y:auto), not the window.
+// Bring focused number fields (the range boxes and the question-count box) to 40% of the visible height, clear of the
+// mobile keyboard. Uses the same helper as the Create screen (window.keepFieldClearOfKeyboard, in challenge.js): it waits
+// for the keyboard to finish sliding, measures the area that is really visible, then does ONE smooth scroll (up or down).
+// The popup is the thing that scrolls. Only fields inside the popup count.
 document.addEventListener('focusin', (e) => {
   const field = e.target;
-  if(!field.matches('input[type="number"], input[type="text"]')) return;
-  setTimeout(() => {
-    const modalRect = diffModal.getBoundingClientRect();
-    const fieldRect = field.getBoundingClientRect();
-    const targetY = modalRect.top + (modalRect.height * 0.4);
-    const delta = fieldRect.top - targetY;
-    diffModal.scrollBy({ top: delta, behavior: 'smooth' });
-  }, 200);
+  if(!diffModal.contains(field) || !field.matches('input[type="number"], input[type="text"]')) return;
+  if(window.keepFieldClearOfKeyboard) window.keepFieldClearOfKeyboard(diffModal, field);
 });
 
 // ---------- Start round: commits picker's choice into real skillConfig, then plays ----------
@@ -694,12 +744,14 @@ btnStartRound.addEventListener('click', () => {
 
   if(pickerLevel === 'custom'){
     skillConfig[key] = Object.assign({}, skillConfig[key], pickerCustom);
+    if(pickerCustom.parity !== undefined) setCustomParity(key, pickerCustom.parity);   // remember Custom's Even/Odd for next time
   } else {
     const preset = DIFFICULTY_PRESETS[key][pickerLevel];
     skillConfig[key].min = preset.min;
     skillConfig[key].max = preset.max;
     if(SKILL_HAS_COUNT[key] && preset.count) skillConfig[key].count = preset.count;
     if(preset.mode) skillConfig[key].mode = preset.mode;
+    if(skillConfig[key].parity !== undefined) skillConfig[key].parity = 'any';   // a level always plays with Any (a leftover Even/Odd used to thin out the numbers, e.g. Tables Easy only gave 11, 13, 15...); Custom keeps its own copy
   }
   saveConfig();
 
@@ -735,9 +787,29 @@ function matchingDifficultyForConfig(key, cfg){
 // Seconds allowed per question for this skill + config (used by game.js for the timer bar).
 function timerSecondsForConfig(key, cfg){
   const level = matchingDifficultyForConfig(key, cfg);
+  const preset = DIFFICULTY_PRESETS[key][level];
+  return preset ? preset.secs : customTimerSeconds(key, cfg);
+}
+// Timer for a Custom config: find the EASIEST level whose range the custom range fits inside (compared by the biggest
+// number in it; Additions/Subtraction also compare how many numbers) and use that level's timer. If it is bigger than the
+// hardest level's, use the hardest level's timer + CUSTOM_OVER_TOP_BONUS_SECS. Skills with a direction (Reciprocals)
+// only compare against the levels that have the same direction.
+function customTimerSeconds(key, cfg){
   const presets = DIFFICULTY_PRESETS[key];
-  const preset = presets[level] || presets[CUSTOM_TIMER_LEVEL];
-  return preset.secs;
+  if(!cfg) return presets[CUSTOM_TIMER_LEVEL].secs;
+  let levels = DIFF_ORDER.filter(l => presets[l]);   // easiest -> hardest
+  const dirOpts = SKILL_MODE_OPTIONS[key];
+  if(dirOpts){
+    const dir = cfg.mode || dirOpts[0].v;
+    const same = levels.filter(l => presets[l].mode === dir);
+    if(same.length) levels = same;
+  }
+  const hi = Math.max(cfg.min, cfg.max);
+  const howMany = SKILL_HAS_COUNT[key] ? (cfg.count || 2) : 0;
+  const fits = l => hi <= presets[l].max && (!howMany || howMany <= (presets[l].count || 2));
+  const found = levels.find(fits);
+  if(found) return presets[found].secs;
+  return presets[levels[levels.length - 1]].secs + CUSTOM_OVER_TOP_BONUS_SECS;
 }
 // Estimated length of a round, in seconds, based on the same per-question timers the game uses.
 // Players rarely use a question's whole timer, so the estimate counts only a fraction of it

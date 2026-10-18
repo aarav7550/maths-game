@@ -8,7 +8,7 @@
 
    HOW IT IS USED
    - js/share.js reads the card's content from the page and turns it into plain data (a "model"):
-       { title, note, stats, sections, accent, footLeft, footRight }
+       { title, message, note, stats, sections, accent, footLeft, footRight }
      then sends the model here. This file draws it and sends back a PNG.
    - Normally this file is started as a Worker (new Worker('js/share-card.js')).
    - If the Worker can't run (old browser), share.js loads this same file as a normal script and
@@ -16,7 +16,7 @@
 
    CHANGING THE LOOK
    - Colours, card width and the main spacing numbers are in the LOOK section just below.
-   - The card is drawn top to bottom in draw(): title, note, stats, sections, footer.
+   - The card is drawn top to bottom in draw(): title, message, note, stats, sections, footer.
      Each part says which CSS it copies (the old styleMap in share.js), so sizes match the Results card.
    - Heights are worked out from the text (lines wrap automatically), so nothing is a fixed height.
    - If you restyle the Results card in style.css, mirror it here (this replaces the old STYLE_MAP).
@@ -275,6 +275,9 @@
 
     // title (Sora 19 bold), 8px below
     if(model.title) y += paragraphs([[ S(model.title, 700, 19, C.text, 'head') ]], x0, y, W, null) + 8;
+
+    // end-of-round message (Inter 14, weight 500, grey, 21px lines), 12px below
+    if(model.message) y += paragraphs([[ S(model.message, 500, 14, C.dim) ]], x0, y, W, 21) + 12;
 
     // note box (tinted, 12.5px, line-height 1.6 = 20px), 20px below
     if(model.note && model.note.length){

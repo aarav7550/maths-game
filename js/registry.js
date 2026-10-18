@@ -18,6 +18,10 @@
 //   customNote          text of the (i) on the Custom button
 //   key                 optional: the keyboard-shortcut letter for this skill (default: first letter of label, × counts as x)
 //   noCustom            true = no Custom option for this skill
+//   modeOptions         optional: [{v, from, to, fromShort?, toShort?}] - the Custom editor shows a swap button (from <-> to) instead
+//                       of the Even/Odd control; the chosen v is saved in cfg.mode (Reciprocals' direction). The *Short words
+//                       are what phones show (the box is narrower there); desktop shows from / to
+//   rangeLimit          optional: {min, max} - Custom min/max must stay inside this (Reciprocals only has 1/1 to 1/30)
 //   pool                optional (lo, hi, parity) => how many different questions the range can give
 //   modeLabel/modeText  optional: name + text of a special setting (e.g. Reciprocals' direction) shown on History / Challenge Details
 //   hint                optional example for the one-time "no need to type the decimal point" popup
@@ -136,7 +140,12 @@ const SKILL_META = {
       easy: { min: 1, max: 30, mode: 'fwd', secs: 10, label: 'Fraction → %', note: 'Numbers from <b>1–30</b>. You get <b>1/7</b>, type the percentage (14.28).' },
       difficult: { min: 1, max: 30, mode: 'rev', secs: 13, label: '% → Fraction', note: 'Numbers from <b>1–30</b>. You get <b>14.28%</b>, type the number under the 1 (7).' }
     },
-    noCustom: true,
+    customNote: 'Pick your own min/max (within 1–30) and which way round you want it.',
+    rangeLimit: { min: 1, max: 30 },   // only 1/1 to 1/30 exist in the RECIPROCALS table
+    modeOptions: [
+      { v: 'fwd', from: 'Fraction', to: 'Percentage', toShort: '%' },
+      { v: 'rev', from: 'Percentage', fromShort: '%', to: 'Fraction' }
+    ],   // left = what you get, right = what you type
     modeLabel: 'Direction',   // optional: a config setting worth showing on History / Challenge Details
     modeText: cfg => cfg.mode === 'rev' ? '% → Fraction' : 'Fraction → %',
     pool: (lo, hi) => Math.max(0, Math.min(30, hi) - Math.max(1, lo) + 1),
@@ -149,7 +158,7 @@ const SKILL_ORDER = Object.keys(SKILL_META);
 const DIFF_ORDER = ['veryeasy', 'easy', 'difficult', 'verydifficult'];   // order levels appear in the picker
 
 const skillDisplayLabels = {}, SKILL_ICON = {}, SKILL_DESC = {}, SKILL_COLOR = {}, SKILL_CLASS = {}, SKILL_KEY = {}, SKILL_KEYS = {}, SKILL_HAS_COUNT = {};
-const DIFFICULTY_PRESETS = {}, CUSTOM_NOTE = {}, NO_CUSTOM = {};
+const DIFFICULTY_PRESETS = {}, CUSTOM_NOTE = {}, NO_CUSTOM = {}, SKILL_MODE_OPTIONS = {}, SKILL_RANGE_LIMIT = {};
 SKILL_ORDER.forEach(k => {
   const m = SKILL_META[k];
   skillDisplayLabels[k] = m.label;
@@ -164,6 +173,8 @@ SKILL_ORDER.forEach(k => {
   DIFFICULTY_PRESETS[k] = m.presets;
   CUSTOM_NOTE[k] = m.customNote || '';
   if(m.noCustom) NO_CUSTOM[k] = true;
+  if(m.modeOptions) SKILL_MODE_OPTIONS[k] = m.modeOptions;   // Custom shows these instead of Even/Odd
+  if(m.rangeLimit) SKILL_RANGE_LIMIT[k] = m.rangeLimit;      // Custom min/max must stay inside this
 });
 
 // Home sections: [{id, label, skills:[keys]}] in the order of SKILL_GROUP_DEFS
