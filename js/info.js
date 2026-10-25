@@ -9,6 +9,21 @@
 (function(){
   document.getElementById('btnAboutUs').addEventListener('click', () => showView('about'));
 
+  // ---------- About page: which build is running ----------
+  // Asks the service worker that is controlling this page (sw.js answers with its CACHE_VERSION),
+  // so the number shown is the version actually in use, not just the newest one on the server.
+  const buildEl = document.getElementById('abBuild');
+  function askBuild(){
+    if(!buildEl || !('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;   // no worker yet: row keeps its dash
+    navigator.serviceWorker.controller.postMessage('GET_VERSION');
+  }
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if(e.data && e.data.type === 'VERSION' && buildEl) buildEl.textContent = e.data.version;
+    });
+  }
+  document.getElementById('btnAboutUs').addEventListener('click', askBuild);
+
   // ---------- Keyboard shortcuts popup ----------
   const scOverlay = document.getElementById('shortcutsModal');
   const hintOverlay = document.getElementById('shortcutHintModal');

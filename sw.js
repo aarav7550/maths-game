@@ -68,6 +68,8 @@ self.addEventListener('activate', (event) => {
 // The page sends this when the user taps "Refresh" on the update message.
 self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
+  // The About page asks which version is running; answer with this worker's own version.
+  if (event.data === 'GET_VERSION' && event.source) event.source.postMessage({ type: 'VERSION', version: CACHE_VERSION });
 });
 
 // FETCH: cache-first. Files come from this version's saved copy (instant, works offline);

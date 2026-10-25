@@ -17,6 +17,7 @@
   const rawShowView = showView;      // original from skills.js
   let currentView = 'home';
   let depth = 0;                     // screens stacked above Home (Home = 0)
+  let viewStack = ['home'];          // the open screens, Home first. Lets us rebuild the browser history if two fast Backs scramble it
   let exiting = false;
 
   function stateFor(view, d){ return { app:'numbers', v:view, d:d }; }
@@ -145,18 +146,27 @@
     if(name === prev) return;
 
     if(name === 'home'){
+      viewStack = ['home'];
       // jump straight back to the Home history entry, however deep we were
       if(depth > 0){ const d = depth; depth = 0; history.go(-d); }
       return;
     }
     // play <-> results swap in place (Back from Results should go Home, not to a finished round)
     if((prev === 'play' && name === 'results') || (prev === 'results' && name === 'play')){
+      viewStack[viewStack.length - 1] = name;
       history.replaceState(stateFor(name, depth), '');
       return;
     }
     depth += 1;
+    viewStack.push(name);
     history.pushState(stateFor(name, depth), '');
   };
+
+  // Called when we are standing on the sentinel entry but the app is NOT on Home (two fast Backs got ahead
+  // of our compensating push). Lays the open screens out again after the sentinel: [sentinel][home][...].
+  function rebuildHistory(){
+    viewStack.forEach((v, i) => history.pushState(stateFor(v, i), ''));
+  }
 
   // ---- Back handling ----
   window.addEventListener('popstate', (e) => {
@@ -166,11 +176,26 @@
     // Compensating push keeps the user "on the same screen" when Back was only meant to close something.
     const stay = () => history.pushState(stateFor(currentView, depth), '');
 
-    if(closeTopPopup()){ stay(); return; }
+    // Landed on the sentinel while the app is on another screen = a second Back arrived before the first
+    // one was settled. That must never leave the app (only a Back from Home does).
+    const lost = (!st || !st.app) && viewStack.length > 1;
+
+    if(closeTopPopup()){ if(lost) rebuildHistory(); else stay(); return; }
 
     if(currentView === 'play' && typeof state !== 'undefined' && state.running){
       document.getElementById('btnExitRound').click();   // opens the Leave-round confirm
-      stay();
+      if(lost) rebuildHistory(); else stay();
+      return;
+    }
+
+    if(lost){
+      // nothing to close: treat it as one normal Back (to the screen below), then lay the history out again
+      viewStack.pop();
+      depth = viewStack.length - 1;
+      const parent = viewStack[depth];
+      rebuildHistory();
+      swap(currentView, parent, 'back');
+      if(parent === 'history' && typeof renderHistory === 'function') renderHistory();
       return;
     }
 
@@ -178,11 +203,13 @@
       // sentinel reached from Home: leave the app
       exiting = true;
       history.back();
-      setTimeout(() => { exiting = false; history.pushState(stateFor('home', 0), ''); currentView = 'home'; depth = 0; }, 250);
+      setTimeout(() => { exiting = false; history.pushState(stateFor('home', 0), ''); currentView = 'home'; depth = 0; viewStack = ['home']; }, 250);
       return;
     }
 
     depth = st.d;
+    viewStack = viewStack.slice(0, st.d + 1);
+    viewStack[st.d] = st.v;
     if(st.v !== currentView){
       swap(currentView, st.v, 'back');
       // views rendered on open need fresh data if things changed while away
