@@ -35,6 +35,26 @@
 #updateToast button{flex:none;min-width:112px;border:0;border-radius:9px;padding:8px 14px;background:#FFFFFF;color:#14171C;font:700 13px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;cursor:pointer;}
 #updateToast button:disabled{opacity:.6;cursor:default;}
 </style>
+<!-- Google Analytics (gtag.js): picks the right property for each site -->
+<script>
+  (function () {
+    var PUBLIC_ID = 'G-BQ4V6ZR9X4';   // public site  (/maths-game/)
+    var BETA_ID   = 'G-JE8BC7CMT5';   // beta site    (/math-game2/)
+    var id = null;
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') id = BETA_ID;
+    else if (location.pathname.indexOf('/maths-game/') === 0) id = PUBLIC_ID;
+    else if (location.pathname.indexOf('/math-game2/') === 0) id = BETA_ID;
+    if (!id) return;   // any other address: send nothing
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
+    document.head.appendChild(s);
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    gtag('js', new Date());
+    gtag('config', id);
+  })();
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -753,9 +773,6 @@
         </div>
       </div>
 
-      <div class="storage-note" style="margin-top:20px;">
-        Progress is saved in <b>this browser only</b>, and survives closing the tab or restarting your computer. It's tied to this browser profile though — clearing browsing data, using a different browser, or Incognito mode won't have it. Use <b>Export</b> now and then to back it up as a file, or to move it to another device.
-      </div>
 
     </div>
   </div>

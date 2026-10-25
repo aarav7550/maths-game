@@ -549,6 +549,7 @@ function openDifficultyPicker(skillKey){
 }
 
 function closeDifficultyPicker(){
+  if(typeof resetPickerShift === 'function') resetPickerShift(true);
   diffModalOverlay.classList.remove('show');
 }
 document.getElementById('btnDiffClose').addEventListener('click', closeDifficultyPicker);
@@ -727,14 +728,155 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Bring focused number fields (the range boxes and the question-count box) to 40% of the visible height, clear of the
-// mobile keyboard. Uses the same helper as the Create screen (window.keepFieldClearOfKeyboard, in challenge.js): it waits
-// for the keyboard to finish sliding, measures the area that is really visible, then does ONE smooth scroll (up or down).
-// The popup is the thing that scrolls. Only fields inside the popup count.
+// KEYBOARD + POPUP: while a number/text field inside the picker is focused AND the on-screen keyboard is up, the whole popup
+// is lifted so that field sits at 40% of the visible height (the area above the keyboard). It comes back down when the keyboard
+// closes (even if the field stays focused), the field loses focus, or the popup closes. Only the popup box moves (CSS transform).
+// Everything runs from one function, syncPicker(), which looks at the real situation (which field? keyboard up?) each time it is
+// called: when the keyboard opens/closes/resizes, when a field gets focus or is tapped, and once more after each move to double-check.
+// The lift is worked out from where the field would be with the popup NOT lifted, so the result is the same however many times it runs.
+// Nothing happens when no keyboard opens (desktop). This no longer uses challenge.js's keepFieldClearOfKeyboard.
+// TEMPORARY DEBUG (set to false when done): a black note listing what moved the popup, and when.
+const PICKER_DEBUG = false;
+let pickerLogLines = [], pickerLogT0 = 0, pickerLogLast = 0;
+function pickerLog(msg){
+  if(!PICKER_DEBUG) return;
+  const now = performance.now();
+  if(now - pickerLogLast > 2500){ pickerLogLines = []; pickerLogT0 = now; }
+  pickerLogLast = now;
+  const vv = window.visualViewport;
+  pickerLogLines.push('+' + Math.round(now - pickerLogT0) + 'ms ' + msg + ' [vvH ' + (vv ? Math.round(vv.height) : '?') +
+    ' pan ' + (vv ? Math.round(vv.offsetTop) : '?') + ' modalScroll ' + Math.round(diffModal.scrollTop) + ']');
+  if(pickerLogLines.length > 14) pickerLogLines.shift();
+  let n = document.getElementById('pickerLogNote');
+  if(!n){
+    n = document.createElement('div');
+    n.id = 'pickerLogNote';
+    n.style.cssText = 'position:fixed;left:6px;right:6px;top:6px;z-index:99999;background:#000;color:#fff;font:10px/1.35 monospace;padding:6px 8px;border-radius:8px;pointer-events:none;white-space:pre-wrap;';
+    document.body.appendChild(n);
+  }
+  n.textContent = pickerLogLines.join('\n');
+  clearTimeout(n._t);
+  n._t = setTimeout(() => n.remove(), 15000);
+}
+let pickerShift = 0;          // lift (px) we last asked for
+let pickerFullH = 0;          // tallest visible height seen = height with no keyboard
+let pickerKbH = 0;            // keyboard height last seen (used to guess it before the keyboard is up)
+let pickerPreLiftUntil = 0;   // while now < this, a missing keyboard just means it has not appeared yet
+let pickerSyncTimer = 0;
+function pickerFieldActive(){
+  const a = document.activeElement;
+  return (a && diffModal.contains(a) && a.matches('input[type="number"], input[type="text"]')) ? a : null;
+}
+function pickerKeyboardUp(){
+  const vv = window.visualViewport;
+  if(!vv) return false;
+  pickerFullH = Math.max(pickerFullH, vv.height, window.innerHeight);
+  const up = pickerFullH - vv.height >= 100;
+  if(up) pickerKbH = pickerFullH - vv.height;
+  return up;
+}
+function pickerLiftNow(){            // how far the popup is lifted right now (works in the middle of the slide too)
+  const t = getComputedStyle(diffModal).transform;
+  if(!t || t === 'none') return 0;
+  try { return -new DOMMatrix(t).m42; } catch(err){ return pickerShift; }
+}
+function setPickerShift(px, instant, ms){
+  pickerShift = px;
+  diffModal.style.willChange = 'transform';                 // keep the popup on its own layer so the slide is drawn by the GPU
+  diffModal.style.transition = instant ? 'none' : 'transform ' + (ms || 340) + 'ms cubic-bezier(.16,.84,.3,1)';
+  diffModal.style.transform = px > 0 ? 'translateY(' + (-px) + 'px)' : '';
+  if(instant){ void diffModal.offsetHeight; diffModal.style.transition = ''; }
+  if(px <= 0){
+    clearTimeout(setPickerShift.t);
+    setPickerShift.t = setTimeout(() => { if(pickerShift <= 0) diffModal.style.willChange = ''; }, 480);
+  }
+}
+function resetPickerShift(instant){
+  clearTimeout(pickerSyncTimer);
+  if(pickerShift > 0 || diffModal.style.transform) setPickerShift(0, instant);
+  if(instant) pickerFullH = 0;
+}
+function queuePickerSync(delay){
+  clearTimeout(pickerSyncTimer);
+  pickerSyncTimer = setTimeout(syncPicker, delay);
+}
+// PRE-LIFT: lift the popup the moment a field is tapped, BEFORE the keyboard is up, using a guess of the keyboard height (the real
+// one once it has been seen). Then the field is already above the keyboard when it opens, so the phone has nothing to pan by itself
+// (that self-pan was the "second scroll"). Phones/tablets only; once the keyboard is up, syncPicker() makes any small correction.
+function preLiftForField(field){
+  if(!window.matchMedia('(hover:none) and (pointer:coarse)').matches) return;
+  const vv = window.visualViewport;
+  if(!vv) return;
+  pickerFullH = Math.max(pickerFullH, vv.height, window.innerHeight);
+  if(pickerKeyboardUp()) return;
+  const kb = pickerKbH || pickerFullH * 0.43;
+  const target = vv.offsetTop + (pickerFullH - kb) * 0.4;
+  const ref = field.closest('#qcountBar') || field;
+  const next = Math.max(0, ref.getBoundingClientRect().top + pickerLiftNow() - target);
+  pickerPreLiftUntil = performance.now() + 700;
+  if(Math.abs(next - pickerShift) > 2){
+    pickerLog('PRELIFT ' + Math.round(pickerShift) + ' -> ' + Math.round(next));
+    setPickerShift(next, false, 420);   // FRONT-LOADED curve on purpose: the field must clear the keyboard line within ~0.1 s or the phone pans by itself (linear / ease-in / ease-in-out all let it)
+  }
+}
+function syncPicker(){
+  const field = pickerFieldActive();
+  const vv = window.visualViewport;
+  if(!field || !vv || !pickerKeyboardUp()){
+    if(field && vv && performance.now() < pickerPreLiftUntil){ queuePickerSync(pickerPreLiftUntil - performance.now() + 20); return; }   // keyboard still on its way
+    if(pickerShift > 0) resetPickerShift(false);            // keyboard gone or field gone: back down
+    return;
+  }
+  const target = vv.offsetTop + vv.height * 0.4;            // 40% down the visible area
+  // The question-count box sits inside a button that grows when tapped (so its own position moves for ~0.2 s):
+  // measure the whole button bar instead, which stays put. Range boxes are measured directly.
+  const ref = field.closest('#qcountBar') || field;
+  const baseTop = ref.getBoundingClientRect().top + pickerLiftNow();   // top with the popup not lifted
+  const next = Math.max(0, baseTop - target);
+  // first move: act on anything; later passes only correct a real miss (stops tiny extra nudges)
+  if(Math.abs(next - pickerShift) > (pickerShift > 0 ? 8 : 2)){
+    pickerLog('LIFT ' + Math.round(pickerShift) + ' -> ' + Math.round(next));
+    setPickerShift(next, false);
+    queuePickerSync(320);                                   // double-check after the slide (the phone may shift the screen too)
+  }
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', () => {
+    const f = pickerFieldActive();
+    if(f){
+      const r = (f.closest('#qcountBar') || f).getBoundingClientRect();
+      pickerLog('vv resize: field bottom ' + Math.round(r.bottom) + ' vs keyboard line ' + Math.round(window.visualViewport.offsetTop + window.visualViewport.height) + ' (lift now ' + Math.round(pickerLiftNow()) + ')');
+    }
+    queuePickerSync(140);
+  });   // keyboard opening / closing / resizing
+  window.visualViewport.addEventListener('scroll', () => { if(pickerFieldActive()) pickerLog('vv scroll (phone panned)'); queuePickerSync(140); });   // phone panned the screen
+  diffModal.addEventListener('scroll', () => { if(pickerFieldActive()) pickerLog('popup content scrolled'); });
+}
 document.addEventListener('focusin', (e) => {
-  const field = e.target;
-  if(!diffModal.contains(field) || !field.matches('input[type="number"], input[type="text"]')) return;
-  if(window.keepFieldClearOfKeyboard) window.keepFieldClearOfKeyboard(diffModal, field);
+  if(!diffModal.contains(e.target) || !e.target.matches('input[type="number"], input[type="text"]')) return;
+  const vv = window.visualViewport;
+  if(vv) pickerFullH = Math.max(pickerFullH, vv.height, window.innerHeight);
+  pickerLog('focus ' + (e.target.id || e.target.className));
+  preLiftForField(e.target);
+  queuePickerSync(60);                                      // (keyboard may not be up yet: its resize events will call this again)
+});
+// Tapping a field that is already focused (keyboard was hidden with Back) sends no focus event, so lift on the tap itself.
+// For the question-count box the thing tapped is the pencil button, which focuses the hidden box behind it.
+document.addEventListener('click', (e) => {
+  if(!diffModal.contains(e.target)) return;
+  const field = e.target.closest('#qcountCustomBtn')
+    ? document.getElementById('qcountInlineValue')
+    : (e.target.matches('input[type="number"], input[type="text"]') ? e.target : null);
+  if(!field) return;
+  setTimeout(() => {                                        // let the button's own handler focus the box first
+    if(document.activeElement !== field) return;
+    preLiftForField(field);
+    queuePickerSync(200);
+  }, 0);
+});
+document.addEventListener('focusout', (e) => {
+  if(!diffModal.contains(e.target)) return;
+  setTimeout(() => { if(!pickerFieldActive()) resetPickerShift(false); }, 150);
 });
 
 // ---------- Start round: commits picker's choice into real skillConfig, then plays ----------

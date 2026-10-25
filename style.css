@@ -1925,3 +1925,68 @@
 /* words: desktop shows the full word, phones the short one (separate rule sets) */
 @media (min-width:641px){ .dir-swap .dir-short{ display:none; } }
 @media (max-width:640px){ .dir-swap .dir-long{ display:none; } }
+
+/* ============================================================
+   END-OF-PAGE ROOM (static bottom space on scrolling pages)
+   So the last thing on a page never sits at the very bottom edge. You only see this space when you scroll
+   to the end of a page that is taller than the screen.
+   HOW TO READ THE NUMBERS: each value = blank space under the last item, as a % of the window height.
+   The last item therefore rests at (100 - value)% from the top when you scroll to the end
+   (10 = last item at 90% from the top; phone and desktop now use the same numbers).
+   NUMBERS TO TUNE (phone and desktop are separate blocks):
+     --end-room-home     Home
+     --end-room-history  History overview (the one with the progress note)
+     --end-room-detail   per-skill history AND full history (the note is gone from these)
+     --end-room          About and Report a bug
+     --bar-page-room     Create + Challenge details (phone): space under the last item INCLUDING the sticky bar
+     --bar-gap           gap between the sticky bar and the bottom edge of the screen (phone).
+                         If you raise --bar-gap, raise --bar-page-room by the same amount.
+   svh (small viewport height) is used because, unlike the app's --vh, it does NOT shrink when the keyboard
+   opens (a shrinking space would make the page jump back down). The plain vh line is the fallback for old browsers.
+   These rules come last on purpose: they replace only the bottom padding / bar gap of the earlier page rules.
+   Left alone ON PURPOSE: Play (no scrolling), Enter code (card is centred in the leftover space), Results (usually fits one screen).
+   ============================================================ */
+@media (max-width: 640px){
+  :root{ --end-room-home: 9vh; --end-room-history: 9vh; --end-room-detail: 12vh; --end-room: 10vh; --bar-page-room: 220px; --bar-gap: 24px; }
+  @supports (height: 1svh){ :root{ --end-room-home: 9svh; --end-room-history: 9svh; --end-room-detail: 12svh; --end-room: 10svh; } }
+}
+@media (min-width: 641px){
+  :root{ --end-room-home: 9vh; --end-room-history: 9vh; --end-room-detail: 12vh; --end-room: 10vh; }
+  @supports (height: 1svh){ :root{ --end-room-home: 9svh; --end-room-history: 9svh; --end-room-detail: 12svh; --end-room: 10svh; } }
+}
+
+/* Home */
+#view-home .wrap{ padding-bottom: var(--end-room-home); }
+
+/* History overview */
+#view-history .wrap{ padding-bottom: var(--end-room-history); }
+
+/* per-skill history + full history */
+#view-history-skill .wrap,
+#view-history-full .wrap{ padding-bottom: var(--end-room-detail); }
+
+/* About + Report a bug */
+#view-about .ab-page,
+#view-bug .bug-page{ padding-bottom: calc(var(--end-room) + env(safe-area-inset-bottom, 0px)); }
+
+/* Create / Mixed drill (same screen) + Challenge details: the same rule on phones so they match.
+   Desktop: Create = --end-room (but never less than the bar), Details = its own 140px. */
+@media (max-width: 640px){
+  #view-challenge .cc-page,
+  #view-challengedetails .cd-page{ padding-bottom: var(--bar-page-room); }
+  #view-challenge .cc-summary-strip,
+  #view-challengedetails .cd-summary-strip{ bottom: calc(var(--bar-gap) + env(safe-area-inset-bottom, 0px)); }
+}
+/* Desktop: the sticky start strip on Create and Challenge details sits 36px from the bottom edge (same as the
+   phone --bar-gap). Only the bar moves; the page padding is unchanged. */
+@media (min-width: 641px){
+  #view-challenge .cc-summary-strip,
+  #view-challengedetails .cd-summary-strip{ bottom: calc(36px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* Desktop: Create and Challenge details share one rule so they match. Floor of 180px keeps the last item
+   clear of the sticky start strip. */
+@media (min-width: 641px){
+  #view-challenge .cc-page,
+  #view-challengedetails .cd-page{ padding-bottom: max(var(--end-room), 180px); }
+}
