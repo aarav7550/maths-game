@@ -480,6 +480,24 @@ function finishRound(){
     saveSessions(sessions);
   }
 
+  // Analytics: tell Google Analytics a round finished (the snippet in index.html defines window.gtag).
+  // Wrapped in try/catch so a problem here can never break the Results screen.
+  try {
+    if(typeof window.gtag === 'function'){
+      const isMixedRound = state.skill === 'mixed';
+      window.gtag('event', 'round_complete', {
+        skill: state.skill,                                                              // e.g. 'half', 'add', or 'mixed'
+        level: isMixedRound ? 'mixed' : matchingDifficultyForConfig(state.skill, activeConfig(state.skill)),   // 'veryeasy' ... 'custom'
+        accuracy: accuracy,                                                              // 0-100
+        avg_time: Math.round(avgTime * 10) / 10,                                         // seconds, 1 decimal
+        questions: state.totalQuestions,
+        is_practice: state.practiceMode ? 'yes' : 'no',
+        from_challenge: state.fromChallenge ? 'yes' : 'no',
+        player_name: resName || '(not set)'
+      });
+    }
+  } catch(e){}
+
   showView('results');
   if(typeof window.prepareResultsShare === 'function') window.prepareResultsShare();   // build the share image in the background (js/share.js)
   if(accuracy >= 80 && typeof window.fireConfetti === 'function') setTimeout(window.fireConfetti, 400);   // confetti for 80%+ accuracy, 0.4 s after Results appears (js/confetti.js)
