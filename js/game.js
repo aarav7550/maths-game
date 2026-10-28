@@ -568,6 +568,57 @@ function missedQuestions(records){
   return records.filter(r => !r.correct && r.problem).map(r => ({ skillKey: r.skillKey, problem: r.problem }));
 }
 
+// ---------- Google Sheet round log (queue, then send) ----------
+// Each round is saved in the browser queue first and sent from there. If the send fails (no internet),
+// it stays in the queue and is tried again on the next load and when the connection returns.
+const SHEET_URL = atob('aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J6c3FrVG9YblNpSG10Mjd3eDN2LWFIeEc0YzFWUkRwYzdodDJkRVRndmNQbUV6cjVzZUJfZlZSX29EQm4yZ1NzWjR2QS9leGVj');
+const SHEET_QUEUE_KEY = 'foxy_sheet_queue_v1';
+let sheetSending = false;
+
+function sheetQueue(){
+  try { return JSON.parse(localStorage.getItem(SHEET_QUEUE_KEY)) || []; } catch(e){ return []; }
+}
+function saveSheetQueue(q){
+  try { localStorage.setItem(SHEET_QUEUE_KEY, JSON.stringify(q)); } catch(e){}
+}
+// Which copy is running, from the address (same rule as the GA snippet in index.html).
+function sheetSource(){
+  const h = location.hostname, p = location.pathname;
+  if(h === 'localhost' || h === '127.0.0.1') return 'local';
+  if(p.indexOf('/maths-game/') !== -1) return 'public';
+  if(p.indexOf('/math-game2/') !== -1) return 'beta';
+  return 'other';
+}
+function sheetEnqueue(payload){
+  const q = sheetQueue();
+  q.push(payload);
+  saveSheetQueue(q);
+  sheetFlush();
+}
+async function sheetFlush(){
+  if(sheetSending || !SHEET_URL || SHEET_URL.startsWith('PASTE')) return;
+  sheetSending = true;
+  try {
+    while(true){
+      const q = sheetQueue();
+      if(!q.length) break;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 15000);
+      try {
+        await fetch(SHEET_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(q[0]), signal: ctrl.signal });
+      } catch(e){
+        break;   // offline or too slow: keep the queue, try again later
+      } finally {
+        clearTimeout(timer);
+      }
+      // The request reached Google, so remove that round from the queue.
+      saveSheetQueue(sheetQueue().filter(r => r.round_id !== q[0].round_id));
+    }
+  } finally {
+    sheetSending = false;
+  }
+}
+
 function finishRound(){
   state.running = false;
   timerTrack.style.visibility = 'hidden';
@@ -648,7 +699,26 @@ function finishRound(){
       });
     }
   } catch(e){}
-
+  // Google Sheet log: every original round, and only the first retry of a round (is_retry: yes).
+  if(!state.isRetry || state.retryIsFirst){
+    try {
+      sheetEnqueue({
+        timestamp: sessionRecord.date,
+        source: sheetSource(),
+        round_id: sessionRecord.date,
+        skill: state.skill,
+        level: state.skill === 'mixed' ? 'mixed' : matchingDifficultyForConfig(state.skill, activeConfig(state.skill)),
+        accuracy: accuracy,
+        avg_time: Math.round(avgTime * 10) / 10,
+        questions: state.totalQuestions,
+        correct: state.correctCount,
+        is_practice: state.practiceMode ? 'yes' : 'no',
+        from_challenge: (!state.isRetry && state.fromChallenge) ? 'yes' : 'no',
+        player_name: resName || '(not set)',
+        is_retry: state.isRetry ? 'yes' : 'no'
+      });
+    } catch(e){}
+  }
   // Retry button: only when something was missed. Retry rounds have no Challenge friends / Share (not a real round).
   state.lastMissed = missedQuestions(state.records);
   applyResultsButtons();
@@ -759,8 +829,13 @@ document.getElementById('btnRetry').addEventListener('click', () => {
     retryChain.push(snapshotResults());   // so Back from the retry's Results returns to the original screen
     if(typeof window.navRetryPush === 'function') window.navRetryPush();   // the one extra browser-history entry (nav.js)
   }
+    state.retryIsFirst = !state.isRetry;   // only the first retry of a round goes to the sheet
   state.retryParent = state.lastRecordDate;   // the saved round this retry belongs to (History shows it underneath that round)
   pendingRetry = state.lastMissed;
   startRound();
   slideIn(document.getElementById('view-play'), 'fwd');
 });
+
+// Send anything left in the queue on load, and again whenever the connection comes back.
+sheetFlush();
+window.addEventListener('online', sheetFlush);
