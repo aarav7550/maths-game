@@ -782,7 +782,19 @@
   /* Results action buttons: row 1 = Home / Challenge friends / Share, row 2 = Go again (full width, bigger) */
   #view-results .actions .btn{ min-width:0; white-space:nowrap; font-size:14.5px; }
   #view-results #btnShareSet{ flex:1.7; }
-  #view-results #btnAgain{ flex:1 0 100%; font-size:17px; padding:17px; border-radius:13px; margin-top:4px; }
+  @media (min-width:481px){
+  /* Results buttons by mode (data-mode is set by game.js applyResultsButtons) */
+  /* Normal row 1 needs real widths (they add up to a full row), otherwise Fresh round slips onto it */
+  #view-results .actions[data-mode^="normal"] #btnHome{ flex:1 1 calc(27% - 7px); }
+  #view-results .actions[data-mode^="normal"] #btnShareSet{ flex:1.7 1 calc(46% - 7px); }
+  #view-results .actions[data-mode^="normal"] #btnShareImage{ flex:1 1 calc(27% - 7px); }
+  #view-results .actions[data-mode="normal-clean"] #btnAgain{ flex:1 0 100%; font-size:17px; padding:17px; border-radius:13px; margin-top:4px; }
+  #view-results .actions[data-mode="normal-miss"] #btnAgain,
+  #view-results .actions[data-mode="normal-miss"] #btnRetry{ flex:1 1 calc(50% - 6px); }
+  #view-results .actions[data-mode^="retry"] #btnHome,
+  #view-results .actions[data-mode^="retry"] #btnAgain{ flex:1 1 calc(50% - 5px); font-size:15px; padding:15px; border-radius:12px; }
+  #view-results .actions[data-mode="retry-miss"] #btnRetry{ flex:1 0 100%; font-size:17px; padding:17px; border-radius:13px; margin-top:4px; }
+  }
 
   @media (max-width:480px){
     #view-results{ padding:16px; }
@@ -791,7 +803,17 @@
     #view-results .card{ padding:18px; }
     #view-results .actions .btn{ font-size:14px; padding:14px 4px; white-space:normal; line-height:1.2; }
     #view-results #btnShareSet{ flex:2.2; }
-    #view-results #btnAgain{ font-size:16.5px; padding:17px; }
+    /* Results buttons by mode (data-mode is set by game.js applyResultsButtons) */
+    /* Normal row 1 needs real widths (they add up to a full row), otherwise Fresh round slips onto it */
+    #view-results .actions[data-mode^="normal"] #btnHome{ flex:1 1 calc(24% - 7px); }
+    #view-results .actions[data-mode^="normal"] #btnShareSet{ flex:2.2 1 calc(52% - 7px); }
+    #view-results .actions[data-mode^="normal"] #btnShareImage{ flex:1 1 calc(24% - 7px); }
+    #view-results .actions[data-mode="normal-clean"] #btnAgain{ flex:1 0 100%; font-size:16.5px; padding:17px; border-radius:13px; margin-top:4px; }
+    #view-results .actions[data-mode="normal-miss"] #btnAgain,
+    #view-results .actions[data-mode="normal-miss"] #btnRetry{ flex:1 1 calc(50% - 6px); }
+    #view-results .actions[data-mode^="retry"] #btnHome,
+    #view-results .actions[data-mode^="retry"] #btnAgain{ flex:1 1 calc(50% - 5px); font-size:14px; padding:15px; border-radius:12px; }
+    #view-results .actions[data-mode="retry-miss"] #btnRetry{ flex:1 0 100%; font-size:16.5px; padding:17px; border-radius:13px; margin-top:4px; }
   }
 
   /* ---------- HISTORY view (Step 4a: Overview only) ---------- */
@@ -1275,6 +1297,11 @@
     border-radius:999px; font-size:9.5px; font-weight:700; letter-spacing:0.05em; line-height:1;
     text-transform:uppercase; white-space:nowrap;
     background:var(--card); border:1px solid var(--line); color:var(--ink-dim);
+    padding-left:calc(8px + 0.05em);   /* letter-spacing leaves a gap after the last letter; this balances it */
+  }
+  /* centre the capital letters exactly (trim the empty space above/below them) in browsers that support it */
+  @supports (text-box: trim-both cap alphabetic){
+    .sr-prac{ text-box: trim-both cap alphabetic; }
   }
   .sr-prac-cell{ display:none; }
   .session-row.is-practice .sr-prac-cell{ display:block; position:absolute; top:-9px; right:var(--row-pr); overflow:visible; }
@@ -1282,6 +1309,52 @@
      Normal rows keep the regular gap between them. Kept small (4px) so two practice rows in a
      row sit only slightly further apart than normal rows. */
   .session-row.is-practice{ margin-top:4px; }
+
+  /* Retry threads in History. The retries of a round hang under it on one tree line:
+     - .thread-kid is one row per retry; its left edge (x = 0) carries the line, so consecutive rows join with no gap
+     - the trunk runs the full height of each row; the last retry's trunk stops at its elbow
+     - the elbow curves from the trunk into the retry box at its vertical middle, and ends exactly where the box starts
+     - nothing moves on hover, so the connector can never poke into the box. Same on phone and desktop. */
+  .thread{ display:flex; flex-direction:column; }
+  .thread-kids{ display:flex; flex-direction:column; margin-left:14px; margin-right:18px; }   /* right margin = the strip width, so the retry boxes end where the parent's strip begins */
+  .thread-kid{ position:relative; padding:4px 0 4px 18px; }
+  .thread-kid:not(:last-child)::before{   /* trunk: only between retries; the last retry has no trunk below its elbow */
+    content:''; position:absolute; left:0; top:0; bottom:0; border-left:2px solid #A9B8BD; pointer-events:none;
+  }
+  .thread-kid::after{    /* elbow: down the trunk, then across into the box */
+    content:''; position:absolute; left:0; top:0; bottom:50%; width:18px;
+    border-left:2px solid #A9B8BD; border-bottom:2px solid #A9B8BD; border-bottom-left-radius:10px; box-sizing:border-box; pointer-events:none;
+  }
+
+  /* A retry as a MINI session: one slim tinted line. Columns are sized from their sample text and spread with
+     space-between, the same way the parent rows balance theirs, so the gaps are equal. */
+  .mini-row{
+    display:grid; grid-template-columns: 3.4em 4.2em 2.1em 3.9em 4.3em; justify-content:space-between; align-items:center; column-gap:0;   /* columns sized to the sample line; space-between gives equal gaps, as on the parent rows */
+    background:rgba(0,23,31,0.04); border:1px solid var(--line-soft, var(--line)); border-radius:10px; padding:9px 12px;
+    font-size:12.5px; color:var(--ink-mid, var(--ink-dim)); font-variant-numeric:tabular-nums;
+    transition:box-shadow .18s ease, border-color .18s ease, background-color .18s ease;
+  }
+  /* Each value sits at the END of its fixed column (right-aligned). A value wider than its column spills to the LEFT
+     into the space before it, so the columns never move. */
+  .mini-row > span{ white-space:nowrap; justify-self:end; }
+  .mini-row .mr-name{ font-weight:700; color:var(--primary); justify-self:start; }
+  .mini-row .mr-time{ color:var(--ink-dim); }
+  .mini-row .mr-acc{ font-weight:700; color:var(--primary); }
+  .mini-row.has-details{ cursor:pointer; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
+  /* lift: straight up only (no scale, which would widen the box to the left and cut into the branch) */
+  .mini-row{ transition:transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s ease, border-color .18s ease, background-color .18s ease; }
+  @media (hover:hover){ .mini-row.has-details:hover{ border-color:var(--primary); background-color:rgba(0,23,31,0.07); transform:translateY(-2px); box-shadow:0 4px 10px rgba(0,23,31,0.09); } }
+  .mini-row.has-details.is-held{ border-color:var(--primary); background-color:rgba(0,23,31,0.07); transform:translateY(-2px); box-shadow:0 4px 10px rgba(0,23,31,0.09); }
+  .mini-row.has-details:active{ background-color:rgba(0,23,31,0.07); }
+  /* Phones: smaller text (same idea as the parent rows) and a tighter indent, so all five values fit including "acc" */
+  @media (max-width:640px){
+    .mini-row{ font-size:clamp(10.5px, 3.1vw, 12.5px); column-gap:6px; padding:9px 10px; }
+    .thread-kids{ margin-left:10px; }
+    .thread-kid{ padding-left:14px; }
+    .thread-kid::after{ width:14px; }
+  }
+  @media (max-width:380px){ .mini-row{ grid-template-columns: 3.4em 4.2em 2.1em 2.5em 4.3em; } .mini-row .mr-avg-word{ display:none; } }
+  @media (prefers-reduced-motion: reduce){ .mini-row{ transition:none; } .mini-row.has-details.is-held, .mini-row.has-details:hover{ transform:none; } }
 
   /* ============================================================
      CREATE CHALLENGE screen (Step 5) — ported from the Create Challenge mockup.
@@ -1938,21 +2011,22 @@
      --end-room-history  History overview (the one with the progress note)
      --end-room-detail   per-skill history AND full history (the note is gone from these)
      --end-room          About and Report a bug
+     --end-room-results  Results (also retry Results). Without it the buttons sit on the bottom edge when the card fills the screen
      --bar-page-room     Create + Challenge details (phone): space under the last item INCLUDING the sticky bar
      --bar-gap           gap between the sticky bar and the bottom edge of the screen (phone).
                          If you raise --bar-gap, raise --bar-page-room by the same amount.
    svh (small viewport height) is used because, unlike the app's --vh, it does NOT shrink when the keyboard
    opens (a shrinking space would make the page jump back down). The plain vh line is the fallback for old browsers.
    These rules come last on purpose: they replace only the bottom padding / bar gap of the earlier page rules.
-   Left alone ON PURPOSE: Play (no scrolling), Enter code (card is centred in the leftover space), Results (usually fits one screen).
+   Left alone ON PURPOSE: Play (no scrolling), Enter code (card is centred in the leftover space).
    ============================================================ */
 @media (max-width: 640px){
-  :root{ --end-room-home: 9vh; --end-room-history: 9vh; --end-room-detail: 12vh; --end-room: 10vh; --bar-page-room: 220px; --bar-gap: 24px; }
-  @supports (height: 1svh){ :root{ --end-room-home: 9svh; --end-room-history: 9svh; --end-room-detail: 12svh; --end-room: 10svh; } }
+  :root{ --end-room-home: 9vh; --end-room-history: 9vh; --end-room-detail: 12vh; --end-room: 10vh; --end-room-results: 10vh; --bar-page-room: 220px; --bar-gap: 24px; }
+  @supports (height: 1svh){ :root{ --end-room-home: 9svh; --end-room-history: 9svh; --end-room-detail: 12svh; --end-room: 10svh; --end-room-results: 10svh; } }
 }
 @media (min-width: 641px){
-  :root{ --end-room-home: 9vh; --end-room-history: 9vh; --end-room-detail: 12vh; --end-room: 10vh; }
-  @supports (height: 1svh){ :root{ --end-room-home: 9svh; --end-room-history: 9svh; --end-room-detail: 12svh; --end-room: 10svh; } }
+  :root{ --end-room-home: 9vh; --end-room-history: 9vh; --end-room-detail: 12vh; --end-room: 10vh; --end-room-results: 10vh; }
+  @supports (height: 1svh){ :root{ --end-room-home: 9svh; --end-room-history: 9svh; --end-room-detail: 12svh; --end-room: 10svh; --end-room-results: 10svh; } }
 }
 
 /* Home */
@@ -1964,6 +2038,9 @@
 /* per-skill history + full history */
 #view-history-skill .wrap,
 #view-history-full .wrap{ padding-bottom: var(--end-room-detail); }
+
+/* Results (normal and retry): the screen itself scrolls, so the room goes on the screen */
+#view-results{ padding-bottom: calc(var(--end-room-results) + env(safe-area-inset-bottom, 0px)); }
 
 /* About + Report a bug */
 #view-about .ab-page,

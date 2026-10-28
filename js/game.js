@@ -17,10 +17,11 @@ btnCancelExit.addEventListener('click', () => {
 });
 btnConfirmExit.addEventListener('click', () => {
   exitModal.classList.remove('show');
+  retryChain.length = 0;   // leaving a round ends any retry chain
   endRoundAbruptly();
   // Rounds started from the Create / Mixed screen go back to it (one step back in history, so the screen is
   // exactly as it was left: skills, levels, question count). Everything else still goes Home.
-  if(state.returnTo === 'challenge') history.back();
+  if(state.returnTo === 'challenge' && !state.isRetry) history.back();   // (a retry has extra history entries, so it just goes Home)
   else showView('home');
 });
 
@@ -132,12 +133,131 @@ document.getElementById('btnSignHintOk').addEventListener('click', () => closeSi
 window.dismissSignHint = () => closeSignHint(false);
 
 // ---------- round logic ----------
+// Retry: set by the Retry button to the list of questions to replay ({ skillKey, problem }). startRound() uses it once.
+let pendingRetry = null;
+
+// ---------- Retry: original Results <-> the current retry (Retry 2, 3 ... replace the retry page) ----------
+// There is only one Results screen in the page, so before a retry starts we keep a snapshot of the Results
+// screen being left. Back on a retry's Results restores the previous snapshot; Home / a new round clears them all.
+const retryChain = [];
+const RESULTS_SNAP_IDS = ['resAcc','resAvg','resBest','resultsTitle','resultsEndMsg','resultsConfigNote','slowestList','perSkillList','missedList'];
+const RESULTS_SNAP_ATTR = ['resultsTitle','resultsEndMsg'];   // these two carry data-share-text (plain text used by the share image)
+
+function snapshotResults(){
+  const snap = { html:{}, attr:{}, display:{} };
+  RESULTS_SNAP_IDS.forEach(id => { snap.html[id] = document.getElementById(id).innerHTML; });
+  RESULTS_SNAP_ATTR.forEach(id => { snap.attr[id] = document.getElementById(id).getAttribute('data-share-text'); });
+  ['perSkillSection','missedSection'].forEach(id => { snap.display[id] = document.getElementById(id).style.display; });
+  snap.recordDate = state.lastRecordDate;
+  snap.accent = document.getElementById('view-results').style.getPropertyValue('--r-accent');
+  snap.scroll = document.getElementById('view-results').scrollTop;
+  snap.end = (typeof window.getEndMessage === 'function') ? window.getEndMessage() : null;
+  snap.totalQuestions = state.totalQuestions;
+  snap.isRetry = state.isRetry;
+  snap.lastMissed = state.lastMissed;
+  return snap;
+}
+
+function restoreResults(snap){
+  RESULTS_SNAP_IDS.forEach(id => { document.getElementById(id).innerHTML = snap.html[id]; });
+  RESULTS_SNAP_ATTR.forEach(id => {
+    const el = document.getElementById(id);
+    if(snap.attr[id] === null) el.removeAttribute('data-share-text'); else el.setAttribute('data-share-text', snap.attr[id]);
+  });
+  Object.keys(snap.display).forEach(id => { document.getElementById(id).style.display = snap.display[id]; });
+  document.getElementById('view-results').style.setProperty('--r-accent', snap.accent);
+  document.getElementById('view-results').scrollTop = snap.scroll || 0;
+  if(typeof window.restoreEndMessage === 'function') window.restoreEndMessage(snap.end);
+  state.lastRecordDate = snap.recordDate;
+  state.totalQuestions = snap.totalQuestions;
+  state.isRetry = snap.isRetry;
+  state.lastMissed = snap.lastMissed;
+  applyResultsButtons();
+  // back on the real (non-retry) Results: rebuild its share image in the background
+  if(!state.isRetry && typeof window.prepareResultsShare === 'function') window.prepareResultsShare();
+}
+
+// Which Results buttons show, and who gets the accent colour (layout is in style.css, keyed on data-mode):
+//   normal round, with misses : Home / Challenge friends / Share, then Fresh round + Retry (Retry has the accent)
+//   normal round, no misses   : Fresh round alone on its row, accent
+//   retry round, with misses  : Home + Fresh round, then Retry on its own row (accent)
+//   retry round, no misses    : Home + Fresh round (accent)
+function applyResultsButtons(){
+  const hasMiss = !!(state.lastMissed && state.lastMissed.length);
+  const actions = document.querySelector('#view-results .actions');
+  actions.dataset.mode = (state.isRetry ? 'retry' : 'normal') + (hasMiss ? '-miss' : '-clean');
+  const btnRetry = document.getElementById('btnRetry');
+  btnRetry.style.display = hasMiss ? '' : 'none';
+  btnRetry.className = 'btn btn-primary';
+  document.getElementById('btnAgain').className = 'btn ' + (hasMiss ? 'btn-ghost' : 'btn-primary');
+  document.getElementById('btnShareSet').style.display = state.isRetry ? 'none' : '';
+  document.getElementById('btnShareImage').style.display = state.isRetry ? 'none' : '';
+}
+
+// short slide for a screen that is re-shown in place (same gentle style as the desktop screen change in nav.js)
+function slideIn(el, dir){
+  if(!el || !el.animate) return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  el.animate([{ transform:'translateX(' + (dir === 'fwd' ? 32 : -32) + 'px)' }, { transform:'none' }],
+             { duration: 300, easing: 'cubic-bezier(.22,.7,.25,1)' });
+}
+
+// Back on a retry's Results: show the Results screen one step up the chain. Returns false when there is
+// nothing to step back to (then the caller does its normal Back). Used by nav.js (system Back / Esc) and ui.js (Back button).
+window.retryBack = function(){
+  const view = document.getElementById('view-results');
+  if(!view.classList.contains('active') || !retryChain.length) return false;
+  const phone = !window.matchMedia('(min-width:641px)').matches;
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(phone && !still && view.animate){
+    // Phone: the same full-page slide as every other Back (see nav.js slide()). There is only one Results screen,
+    // so a picture copy of the retry's Results slides out to the right while the restored screen drifts in underneath.
+    const ghost = view.cloneNode(true);          // copy of the retry's Results (ids stay so the CSS still applies; it is removed below)
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.style.pointerEvents = 'none';
+    view.parentNode.appendChild(ghost);          // added after the real screen, so getElementById still finds the real one
+    ghost.scrollTop = view.scrollTop;
+    restoreResults(retryChain.pop());
+    ghost.classList.add('vt-top');
+    view.classList.add('vt-under');
+    const opts = { duration: 300, easing: 'cubic-bezier(.22,.7,.25,1)', fill: 'forwards' };
+    const a1 = ghost.animate([{ transform:'translateX(0)' }, { transform:'translateX(100%)' }], opts);
+    const a2 = view.animate([{ transform:'translateX(-25%)' }, { transform:'translateX(0)' }], opts);
+    const cleanup = () => {
+      a1.cancel(); a2.cancel();
+      view.classList.remove('vt-under');
+      if(ghost.parentNode) ghost.parentNode.removeChild(ghost);
+    };
+    Promise.all([a1.finished, a2.finished]).then(cleanup).catch(cleanup);
+    setTimeout(() => { if(ghost.parentNode) cleanup(); }, 600);   // safety net
+    return true;
+  }
+  restoreResults(retryChain.pop());
+  slideIn(view, 'back');                         // desktop: the short slide the other screens use there
+  return true;
+};
+window.clearRetryChain = function(){ retryChain.length = 0; };
+window.retryDepth = function(){ return retryChain.length; };   // how many Results screens are stacked below the one showing
+
+// Random order (Fisher-Yates). Uses Math.random on purpose: the seeded `rng` must never be touched by a retry.
+function shuffled(list){
+  const a = list.slice();
+  for(let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function startRound(){
-  // First time on a skill with decimal answers: show the hint first, round starts after "Got it".
-  const hintSkills = unseenDecimalSkills();
-  if(hintSkills.length){ showDecimalHint(hintSkills); return; }
-  // iPhone/iPad and desktop, first time on a skill with negative answers: explain how the sign works there.
-  if(signHintNeeded()){ showSignHint(); return; }
+  // The hint popups were already shown by the original round, so a retry skips them.
+  if(!pendingRetry){
+    // First time on a skill with decimal answers: show the hint first, round starts after "Got it".
+    const hintSkills = unseenDecimalSkills();
+    if(hintSkills.length){ showDecimalHint(hintSkills); return; }
+    // iPhone/iPad and desktop, first time on a skill with negative answers: explain how the sign works there.
+    if(signHintNeeded()){ showSignHint(); return; }
+  }
 
   state.currentIndex = 0;
   state.correctCount = 0;
@@ -147,7 +267,14 @@ function startRound(){
   state.running = true;
   state.awaitingAdvance = false;
 
-  if(pendingChallenge){
+  if(pendingRetry){
+    // Retry: replay the missed questions in a new random order. Skill, settings, practice mode, seed and
+    // Leave-round destination all stay exactly as the original round had them (nothing is reset here).
+    state.isRetry = true;
+    state.retryQueue = shuffled(pendingRetry);
+    state.totalQuestions = state.retryQueue.length;
+    pendingRetry = null;
+  } else if(pendingChallenge){
     // Starting from an entered challenge code: use its included skills, config, question
     // count and seed WITHOUT touching the player's own saved settings (skillConfig,
     // mixedIncluded) at all — those are restored automatically once the round ends.
@@ -160,16 +287,22 @@ function startRound(){
     state.fromChallenge = ch.fromChallenge !== false;   // Mixed drill passes false; entered codes leave it unset (= true)
     state.returnTo = ch.returnTo || 'home';             // where "Leave round" goes; only Create/Mixed set it
     pendingChallenge = null;
+    state.isRetry = false;
+    state.baseTotal = state.totalQuestions;
   } else {
     activeChallengeCfg = null;
     activeChallengeIncluded = null;
     state.seed = randomSeed();
     state.fromChallenge = false;
     state.returnTo = 'home';
+    state.isRetry = false;
+    state.baseTotal = state.totalQuestions;   // remembered so "Go again" from a retry screen can start a full-size round
   }
-  rng = mulberry32(state.seed);
-
-  resetUsedTracking(); // fresh no-repeat tracking per round
+  if(!state.isRetry){
+    retryChain.length = 0;   // a normal / fresh round starts a new chain
+    rng = mulberry32(state.seed);
+    resetUsedTracking(); // fresh no-repeat tracking per round
+  }
 
   // TODO (Step 3b): topStreak pill removed from topbar — rewire streak
   // display into Play screen's meta-chip row when Play is redone.
@@ -210,9 +343,17 @@ function nextQuestion(){
     return;
   }
   state.awaitingAdvance = false;
-  const skillKey = pickSkillKey();
+  let skillKey, problem;
+  if(state.isRetry){
+    const item = state.retryQueue[state.currentIndex];   // a retry replays a fixed list: no new random draws
+    skillKey = item.skillKey;
+    problem = item.problem;
+  } else {
+    skillKey = pickSkillKey();
+    problem = SKILLS[skillKey].gen();
+  }
   state.currentSkillKey = skillKey;
-  state.currentProblem = SKILLS[skillKey].gen();
+  state.currentProblem = problem;
   problemText.textContent = state.currentProblem.text;
   const skillLabel = SKILLS[skillKey].label;
   skillTag.textContent = state.practiceMode ? skillLabel + ' · Practice' : skillLabel;
@@ -365,7 +506,8 @@ function lockInAnswer(value){
     answerText: state.currentProblem.answerText || null,
     given: (value === null || Number.isNaN(value)) ? null : value,
     correct: correct,
-    timeMs: elapsed
+    timeMs: elapsed,
+    problem: state.currentProblem   // the whole question (incl. every accepted answer), so Retry can replay it. Never saved to storage.
   });
   if(correct){
     state.correctCount++;
@@ -420,6 +562,12 @@ function buildSessionDetails(records){
   };
 }
 
+// The questions missed in a round (wrong or timed out), in the order played, as { skillKey, problem }.
+// Retry replays exactly these (in a new random order).
+function missedQuestions(records){
+  return records.filter(r => !r.correct && r.problem).map(r => ({ skillKey: r.skillKey, problem: r.problem }));
+}
+
 function finishRound(){
   state.running = false;
   timerTrack.style.visibility = 'hidden';
@@ -465,14 +613,17 @@ function finishRound(){
     avgTime: avgTime,
     bestTime: bestTime,
     config: configSnapshot,
-    fromChallenge: state.fromChallenge,
-    practice: state.practiceMode,
+    fromChallenge: state.isRetry ? false : state.fromChallenge,
+    practice: state.isRetry ? true : state.practiceMode,   // a retry is saved with the practice rounds (never in stats / graphs / streak)
+    retry: state.isRetry ? true : undefined,
     details: buildSessionDetails(state.records)   // wrong + slowest questions, shown when you tap the session in History
   };
+  if(state.isRetry) sessionRecord.retryOf = state.retryParent;   // History threads: shown under the round it retried
+  state.lastRecordDate = sessionRecord.date;                      // so a retry of THIS round can point back to it
 
   if(typeof window.showEndMessage === 'function') window.showEndMessage(accuracy, sessionRecord.date);   // title + line under it (js/endmessages.js); the date makes History show the same one
 
-  if(state.practiceMode){
+  if(state.practiceMode || state.isRetry){
     practiceSessions.push(sessionRecord);
     savePracticeSessions(practiceSessions);
   } else {
@@ -483,7 +634,7 @@ function finishRound(){
   // Analytics: tell Google Analytics a round finished (the snippet in index.html defines window.gtag).
   // Wrapped in try/catch so a problem here can never break the Results screen.
   try {
-    if(typeof window.gtag === 'function'){
+    if(typeof window.gtag === 'function' && !state.isRetry){   // retries are not real rounds, so they are not sent
       const isMixedRound = state.skill === 'mixed';
       window.gtag('event', 'round_complete', {
         skill: state.skill,                                                              // e.g. 'half', 'add', or 'mixed'
@@ -498,9 +649,13 @@ function finishRound(){
     }
   } catch(e){}
 
+  // Retry button: only when something was missed. Retry rounds have no Challenge friends / Share (not a real round).
+  state.lastMissed = missedQuestions(state.records);
+  applyResultsButtons();
+
   showView('results');
-  if(typeof window.prepareResultsShare === 'function') window.prepareResultsShare();   // build the share image in the background (js/share.js)
-  if(accuracy >= 80 && typeof window.fireConfetti === 'function') setTimeout(window.fireConfetti, 400);   // confetti for 80%+ accuracy, 0.4 s after Results appears (js/confetti.js)
+  if(!state.isRetry && typeof window.prepareResultsShare === 'function') window.prepareResultsShare();   // build the share image in the background (js/share.js)
+  if(accuracy >= (state.isRetry ? 90 : 80) && typeof window.fireConfetti === 'function') setTimeout(window.fireConfetti, 400);   // confetti for 80%+ accuracy, 0.4 s after Results appears (js/confetti.js)
 }
 
 function renderResultsBreakdown(){
@@ -583,7 +738,7 @@ function describeSkillConfig(key, cfg){
 function renderResultsConfigNote(){
   const note = document.getElementById('resultsConfigNote');
   const parts = [];
-  parts.push(`<b>${state.totalQuestions} questions</b>${state.practiceMode ? ' · practice mode' : ''}${state.fromChallenge ? ' · from a challenge code' : ''}`);
+  parts.push(`<b>${state.totalQuestions} questions</b>${state.isRetry ? ' · retry of missed questions' : ''}${state.practiceMode ? ' · practice mode' : ''}${state.fromChallenge ? ' · from a challenge code' : ''}`);
   if(state.skill === 'mixed'){
     const included = activeIncludedList();
     parts.push('Mix: ' + included.map(k => skillDisplayLabels[k]).join(', '));
@@ -593,3 +748,19 @@ function renderResultsConfigNote(){
   }
   note.innerHTML = parts.join('<br>');
 }
+
+// Retry button on Results: replay the questions missed in the round that just finished.
+document.getElementById('btnRetry').addEventListener('click', () => {
+  if(!state.lastMissed || !state.lastMissed.length) return;
+  // Only ever two pages: the original Results and the current retry. The first retry saves the original Results
+  // and adds one browser-history entry; a retry of a retry just replaces the retry page (nothing is stacked),
+  // so Back from any retry goes straight to the original Results.
+  if(!state.isRetry){
+    retryChain.push(snapshotResults());   // so Back from the retry's Results returns to the original screen
+    if(typeof window.navRetryPush === 'function') window.navRetryPush();   // the one extra browser-history entry (nav.js)
+  }
+  state.retryParent = state.lastRecordDate;   // the saved round this retry belongs to (History shows it underneath that round)
+  pendingRetry = state.lastMissed;
+  startRound();
+  slideIn(document.getElementById('view-play'), 'fwd');
+});

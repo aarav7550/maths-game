@@ -214,8 +214,20 @@
       swap(currentView, st.v, 'back');
       // views rendered on open need fresh data if things changed while away
       if(st.v === 'history' && typeof renderHistory === 'function') renderHistory();
+    } else if(currentView === 'results'){
+      // Same screen, one history entry up = Back on a retry's Results (every retry has its own entry, see navRetryPush).
+      // Show the previous Results screen; if there is none to show (e.g. after Fresh round), just go Home.
+      if(!(typeof window.retryBack === 'function' && window.retryBack())) window.showView('home');
     }
   });
+
+  // Retry button (game.js) calls this BEFORE the retry round starts: one real history entry per retry level,
+  // pushed on the tap itself, so system Back simply pops one level and never needs a compensating push.
+  window.navRetryPush = function(){
+    depth += 1;
+    viewStack.push('results');
+    history.pushState(stateFor('results', depth), '');
+  };
 
   // ---- in-app back buttons go through the same path as the system button ----
   function appBack(){ if(depth > 0) history.back(); else window.showView('home'); }

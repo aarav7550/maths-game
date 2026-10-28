@@ -970,12 +970,14 @@ function matchingDifficulty(key){
   return matchingDifficultyForConfig(key, skillConfig[key]);
 }
 
-document.getElementById('btnHome').addEventListener('click', () => showView('home'));
-document.getElementById('btnResultsBack').addEventListener('click', () => showView('home'));
+document.getElementById('btnHome').addEventListener('click', () => { if(window.clearRetryChain) window.clearRetryChain(); showView('home'); });
+// Back: on a retry's Results it steps up one retry level (same as the system Back); otherwise Home
+document.getElementById('btnResultsBack').addEventListener('click', () => { if(window.retryDepth && window.retryDepth() > 0){ history.back(); return; } showView('home'); });
 
 // Go again: replay the same skill/config/question count with fresh questions.
 // state.skill / totalQuestions / practiceMode still hold the round just finished.
 document.getElementById('btnAgain').addEventListener('click', () => {
+  if(state.isRetry) state.totalQuestions = state.baseTotal;   // from a retry screen: a full-size round again, not just the missed few
   if(activeChallengeIncluded){
     // Challenge or Mixed drill round: re-run its skills + settings, but with a new random seed
     pendingChallenge = {

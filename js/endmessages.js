@@ -138,6 +138,11 @@ const END_MESSAGE_BANDS = [
     if (view && view.classList.contains('active') && typeof window.prepareResultsShare === 'function') window.prepareResultsShare();
   };
 
+  // Used by the Retry chain (game.js): keep / put back the pair of the Results screen being left / restored.
+  // restoreEndMessage does not redraw; game.js puts the screen's own HTML back.
+  window.getEndMessage = function () { return current; };
+  window.restoreEndMessage = function (c) { current = c; };
+
   // Plain-text pair for a saved round (History share image): { title, message }.
   window.pickEndMessage = function (accuracy, name, seed) {
     var p = pickPair(accuracy, seed);

@@ -83,7 +83,7 @@ function sessionRowHtml(s, withSkill){
   const line1 = '<div class="sr-line1">'
     + (withSkill ? '<div class="sr-cell sr-skill">' + (historySkillLabels[s.skill] || s.skill) + '</div>' : '')
     + '<div class="sr-cell sr-time">' + fmtTimeLabel(s.date) + '</div>'
-    + (s.practice ? '<div class="sr-cell sr-prac-cell"><span class="sr-prac">Practice</span></div>' : '')
+    + (s.practice ? '<div class="sr-cell sr-prac-cell"><span class="sr-prac">' + (s.retry ? 'Retry' : 'Practice') + '</span></div>' : '')
     + '</div>';
   const line2 = '<div class="sr-line2">'
     + levelCell
@@ -109,6 +109,54 @@ function groupedRowsHtml(list, withSkill){
       lastDay = day;
     }
     html += sessionRowHtml(s, withSkill);
+  });
+  return html;
+}
+
+// ---- Threads: a retry is shown indented under the round it retried (like replies under a comment) ----
+// A retry record has retryOf = the `date` of the round it retried. All retries of one round (and retries of those
+// retries) sit under that round in the order they were played. A retry whose parent is not in the list
+// (older retries saved before this existed, or a deleted parent) simply shows as its own row.
+// `list` can be in any order; returns the top-level rows NEWEST first, each { s, kids: [retry rows, oldest first] }.
+function buildThreads(list){
+  const nodes = new Map();
+  list.forEach(s => nodes.set(s.date, { s: s, kids: [] }));
+  const tops = [];
+  list.slice().sort((a, b) => a.date - b.date).forEach(s => {
+    const node = nodes.get(s.date);
+    let root = null, p = s.retryOf != null ? nodes.get(s.retryOf) : null, hops = 0;
+    // walk up to the top-most parent (guarded so a bad link can never loop)
+    while(p && p !== node && hops++ < 50){ root = p; p = p.s.retryOf != null ? nodes.get(p.s.retryOf) : null; }
+    if(root && root !== node) root.kids.push(node); else tops.push(node);
+  });
+  return tops.reverse();
+}
+
+// A retry shown as a slim "mini session" under its round: Retry 1 / time / questions / avg / accuracy.
+// Tapping it opens the same review popup (it uses the same data-date / data-prac the full rows use).
+function miniRowHtml(s, n){
+  const hasDetails = isReviewable(s);
+  return '<div class="mini-row' + (hasDetails ? ' has-details' : '') + '"'
+    + (hasDetails ? ' data-date="' + s.date + '" data-prac="' + (s.practice ? 1 : 0) + '"' : '') + '>'
+    + '<span class="mr-name">Retry ' + n + '</span>'
+    + '<span class="mr-time">' + fmtTimeLabel(s.date) + '</span>'
+    + '<span class="mr-qs">' + (s.questions || '—') + ' Qs</span>'
+    + '<span class="mr-avg">' + s.avgTime.toFixed(1) + 's<span class="mr-avg-word"> avg</span></span>'
+    + '<span class="mr-acc">' + s.accuracy + '%<span class="mr-acc-word"> acc</span></span></div>';
+}
+
+// Same as groupedRowsHtml, but for threads. Day headers follow the top-level round.
+function threadsHtml(tops, withSkill){
+  let html = '', lastDay = null;
+  tops.forEach(node => {
+    const day = startOfDayMs(node.s.date);
+    if(day !== lastDay){
+      html += '<div class="day-header">' + fmtDayLabel(node.s.date) + '</div>';
+      lastDay = day;
+    }
+    if(!node.kids.length){ html += sessionRowHtml(node.s, withSkill); return; }
+    html += '<div class="thread">' + sessionRowHtml(node.s, withSkill)
+      + '<div class="thread-kids">' + node.kids.map((k, i) => '<div class="thread-kid">' + miniRowHtml(k.s, i + 1) + '</div>').join('') + '</div></div>';
   });
   return html;
 }
@@ -232,7 +280,7 @@ function openReview(s){
   const isMixed = s.skill === 'mixed';
   const lv = sessionLevelInfo(s);
   const L = reviewLists(s.details);
-  rvTitleEl.textContent = (historySkillLabels[s.skill] || s.skill) + (s.practice ? ' · Practice' : '');
+  rvTitleEl.textContent = (historySkillLabels[s.skill] || s.skill) + (s.retry ? ' · Retry' : (s.practice ? ' · Practice' : ''));
   closeLevelPop(); rvLevelPopEl.classList.remove('show');
   rvSubEl.innerHTML = fmtDayLabel(s.date) + ', ' + fmtTimeLabel(s.date) + ' · '
     + (lv.range ? '<span class="sr-level rv-level"><span class="sr-level-txt">' + lv.label + '</span></span>' : lv.label);
@@ -274,7 +322,7 @@ function wireRowHold(list){
     lastPointerWasTouch = e.pointerType === 'touch';
     if(!lastPointerWasTouch) return;                       // a mouse has real hover, handled in CSS
     if(e.target.closest('.sr-level') || e.target.closest('.level-popover')) return;   // those open the level popover
-    const r = e.target.closest('.session-row.has-details');
+    const r = e.target.closest('.session-row.has-details, .mini-row.has-details');
     if(!r) return;
     release();
     row = r; pid = e.pointerId;
@@ -306,7 +354,7 @@ function wireRowHold(list){
   list.addEventListener('pointercancel', release);        // the browser took over for scrolling
   // a long press must not pop up the phone's text-selection / context menu on these rows
   list.addEventListener('contextmenu', (e) => {
-    if(lastPointerWasTouch && e.target.closest('.session-row.has-details')) e.preventDefault();
+    if(lastPointerWasTouch && e.target.closest('.session-row.has-details, .mini-row.has-details')) e.preventDefault();
   });
 }
 function wireRowReview(list){
@@ -314,7 +362,7 @@ function wireRowReview(list){
   list.addEventListener('click', (e) => {
     if(Date.now() - touchOpenedAt < 700) return;           // this tap was already handled on release
     if(e.target.closest('.sr-level') || e.target.closest('.level-popover')) return;   // those open the level popover instead
-    const row = e.target.closest('.session-row.has-details');
+    const row = e.target.closest('.session-row.has-details, .mini-row.has-details');
     if(!row) return;
     const s = findRound(Number(row.dataset.date), row.dataset.prac === '1');
     if(s && isReviewable(s)) openReview(s);
@@ -419,7 +467,7 @@ function renderRecentSessions(){
     return;
   }
   seeAll.style.display = 'block';
-  sessionsListEl.innerHTML = groupedRowsHtml(rounds.slice(-10).reverse(), true);
+  sessionsListEl.innerHTML = threadsHtml(buildThreads(rounds).slice(0, 10), true);   // the 10 newest rounds, each with its retries underneath
 }
 
 function renderHistory(){
@@ -482,10 +530,11 @@ function renderSkillDetail(){
     return;
   }
   skdEmptyNote.style.display = 'none';
-  const pages = Math.max(1, Math.ceil(rows.length / FULL_PAGE_SIZE));
+  const threads = buildThreads(rows);   // pages count top-level rounds; their retries come along underneath
+  const pages = Math.max(1, Math.ceil(threads.length / FULL_PAGE_SIZE));
   skdPage = Math.min(Math.max(1, skdPage), pages);
-  const slice = rows.slice().reverse().slice((skdPage - 1) * FULL_PAGE_SIZE, skdPage * FULL_PAGE_SIZE);
-  skdListEl.innerHTML = groupedRowsHtml(slice, false);
+  const slice = threads.slice((skdPage - 1) * FULL_PAGE_SIZE, skdPage * FULL_PAGE_SIZE);
+  skdListEl.innerHTML = threadsHtml(slice, false);
   skdPaginationEl.innerHTML = pagerHtml(skdPage, pages);
 }
 
@@ -529,11 +578,12 @@ function renderFullHistory(){
     return;
   }
   fullEmptyEl.style.display = 'none';
-  const pages = Math.max(1, Math.ceil(total / FULL_PAGE_SIZE));
+  const threads = buildThreads(rounds);   // pages count top-level rounds; their retries come along underneath
+  const pages = Math.max(1, Math.ceil(threads.length / FULL_PAGE_SIZE));
   fullPage = Math.min(Math.max(1, fullPage), pages);
-  const slice = rounds.slice().reverse().slice((fullPage - 1) * FULL_PAGE_SIZE, fullPage * FULL_PAGE_SIZE);
+  const slice = threads.slice((fullPage - 1) * FULL_PAGE_SIZE, fullPage * FULL_PAGE_SIZE);
   fullCountNoteEl.textContent = total + (total === 1 ? ' session total' : ' sessions total');
-  fullListEl.innerHTML = groupedRowsHtml(slice, true);
+  fullListEl.innerHTML = threadsHtml(slice, true);
   fullPaginationEl.innerHTML = pagerHtml(fullPage, pages);
 }
 
