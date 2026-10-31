@@ -90,14 +90,71 @@ renderGreeting();
 
 const nameOverlay = document.getElementById('nameOverlay');
 const nameInput = document.getElementById('nameInput');
+// ---------- reserved names ----------
+// A reserved name needs a password: type  Name#password  to use it.
+// Only the SHA-256 hash of the password is stored (the repo is public). A speed bump, not real security.
+const RESERVED_NAMES = { kai: 'Kai', aarav: 'Aarav' };   // lower-case typed name -> name that gets saved
+const RESERVED_PW_HASH = '252bd45ac5072c3659d873ebe923bf9c108653b3a60c225f33de27486631d67d';
+const nameErr = document.getElementById('nameErr');
+// Error look: input border turns red, and a small icon + message sits left-aligned under the box.
+// The message sits 6px under the box (left-aligned). The space between the message and the buttons is the
+// same as the space that was between the box and the buttons before the message appeared. Both gaps are
+// measured on screen, so this does not depend on the CSS margins of the box or the buttons.
+const NAME_ERR_GAP = 6;
+function showNameError(msg){
+  const shown = nameErr.style.display === 'flex';
+  nameErr.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="7" x2="12" y2="13"/><circle cx="12" cy="17" r="1.2" fill="currentColor" stroke="none"/></svg><span></span>';
+  nameErr.querySelector('span').textContent = msg;
+  nameInput.style.borderColor = '#C0392B';
+  if(shown) return;                                       // already placed, only the text was refreshed
+  const actions = nameOverlay.querySelector('.name-actions');
+  const origGap = actions.getBoundingClientRect().top - nameInput.getBoundingClientRect().bottom;
+  nameInput.style.marginBottom = '0';
+  nameErr.style.margin = '0';
+  nameErr.style.display = 'flex';
+  const ib = nameInput.getBoundingClientRect().bottom;
+  const er = nameErr.getBoundingClientRect();
+  const at = actions.getBoundingClientRect().top;
+  nameErr.style.marginTop = (NAME_ERR_GAP - (er.top - ib)) + 'px';
+  nameErr.style.marginBottom = (origGap - (at - er.bottom)) + 'px';
+}
+function hideNameError(){
+  nameErr.style.display = 'none';
+  nameErr.style.margin = '';
+  nameInput.style.borderColor = '';
+  nameInput.style.marginBottom = '';
+}
+async function sha256Hex(text){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));   // needs https or localhost
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+// Returns the name to save, or null when the name is reserved and not allowed.
+async function resolveReservedName(typed){
+  const t = typed.trim();
+  const hashAt = t.indexOf('#');
+  const base = (hashAt === -1 ? t : t.slice(0, hashAt)).trim();
+  const canon = RESERVED_NAMES[base.toLowerCase()];
+  if(!canon) return t;                                   // not reserved: save as typed
+  if(hashAt === -1){                                     // reserved, no password
+    const current = getDisplayName().trim();
+    return current.toLowerCase() === base.toLowerCase() ? current : null;   // keep an already-saved name
+  }
+  try{
+    return (await sha256Hex(t.slice(hashAt + 1))) === RESERVED_PW_HASH ? canon : null;
+  }catch(err){ return null; }                            // no crypto.subtle (e.g. file://): treat as wrong
+}
+
 function openNameEditor(){
   nameInput.value = getDisplayName();
+  hideNameError();
   nameOverlay.classList.add('show');
   setTimeout(() => { nameInput.focus(); nameInput.select(); }, 60);
 }
 function closeNameEditor(){ nameOverlay.classList.remove('show'); nameInput.blur(); }
-function commitName(){
-  setDisplayName(nameInput.value);
+async function commitName(){
+  const name = await resolveReservedName(nameInput.value);
+  if(name === null){ showNameError('That name is taken, try another.'); return; }
+  setDisplayName(name);
   renderGreeting();
   if(window.refreshEndMessage) window.refreshEndMessage();   // Results message: "set a name" button -> the name (js/endmessages.js)
   closeNameEditor();
@@ -107,6 +164,7 @@ dgreetName.addEventListener('click', openNameEditor);
 document.getElementById('nameSave').addEventListener('click', commitName);
 document.getElementById('nameCancel').addEventListener('click', closeNameEditor);
 nameOverlay.addEventListener('click', (e) => { if(e.target === nameOverlay) closeNameEditor(); });
+nameInput.addEventListener('input', hideNameError);
 nameInput.addEventListener('keydown', (e) => {
   if(e.key === 'Enter'){ e.preventDefault(); commitName(); }
   else if(e.key === 'Escape'){ closeNameEditor(); }

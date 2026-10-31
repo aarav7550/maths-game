@@ -573,7 +573,16 @@ function missedQuestions(records){
 // it stays in the queue and is tried again on the next load and when the connection returns.
 const SHEET_URL = atob('aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J6c3FrVG9YblNpSG10Mjd3eDN2LWFIeEc0YzFWUkRwYzdodDJkRVRndmNQbUV6cjVzZUJfZlZSX29EQm4yZ1NzWjR2QS9leGVj');
 const SHEET_QUEUE_KEY = 'foxy_sheet_queue_v1';
+const SHEET_STATUS_KEY = KEY_PREFIX + KEY_NAMES.sheetStatus;   // { lastSent, err, errAt }, read by the About developer panel (info.js)
 let sheetSending = false;
+
+// Remembers the result of the last send so the hidden developer panel can show it.
+function sheetSetStatus(patch){
+  try {
+    const s = JSON.parse(localStorage.getItem(SHEET_STATUS_KEY)) || {};
+    localStorage.setItem(SHEET_STATUS_KEY, JSON.stringify(Object.assign(s, patch)));
+  } catch(e){}
+}
 
 function sheetQueue(){
   try { return JSON.parse(localStorage.getItem(SHEET_QUEUE_KEY)) || []; } catch(e){ return []; }
@@ -581,7 +590,7 @@ function sheetQueue(){
 function saveSheetQueue(q){
   try { localStorage.setItem(SHEET_QUEUE_KEY, JSON.stringify(q)); } catch(e){}
 }
-// Which copy is running, from the address (same rule as the GA snippet in index.html).
+// Which copy is running, from the address: local, public (/maths-game/), beta (/math-game2/) or other.
 function sheetSource(){
   const h = location.hostname, p = location.pathname;
   if(h === 'localhost' || h === '127.0.0.1') return 'local';
@@ -595,6 +604,20 @@ function sheetEnqueue(payload){
   saveSheetQueue(q);
   sheetFlush();
 }
+// One POST to the script. Normal mode reads the script's reply ({ok:true} / {ok:false}); no-cors mode cannot.
+async function sheetPost(item, noCors){
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const res = await fetch(SHEET_URL, Object.assign(
+      { method: 'POST', body: JSON.stringify(item), signal: ctrl.signal },
+      noCors ? { mode: 'no-cors' } : {}
+    ));
+    return noCors ? null : await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
 async function sheetFlush(){
   if(sheetSending || !SHEET_URL || SHEET_URL.startsWith('PASTE')) return;
   sheetSending = true;
@@ -602,16 +625,31 @@ async function sheetFlush(){
     while(true){
       const q = sheetQueue();
       if(!q.length) break;
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 15000);
+      let reply;
       try {
-        await fetch(SHEET_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(q[0]), signal: ctrl.signal });
+        reply = await sheetPost(q[0], false);
       } catch(e){
-        break;   // offline or too slow: keep the queue, try again later
-      } finally {
-        clearTimeout(timer);
+        const name = e && e.name;
+        if(name === 'AbortError'){ sheetSetStatus({ err: 'Timed out after 15 s', errAt: Date.now() }); break; }
+        if(navigator.onLine === false){ sheetSetStatus({ err: 'Could not send (offline?)', errAt: Date.now() }); break; }
+        if(name === 'SyntaxError'){ sheetSetStatus({ err: 'Script reply was not understood', errAt: Date.now() }); break; }
+        // Online, but the browser blocked reading the reply: fall back to the old way (request sent = done).
+        // Safe to send twice, the script skips a round_id it already has.
+        try {
+          await sheetPost(q[0], true);
+          reply = { ok: true };
+        } catch(e2){
+          sheetSetStatus({ err: 'Could not send (offline?)', errAt: Date.now() });
+          break;
+        }
       }
-      // The request reached Google, so remove that round from the queue.
+      if(!reply || reply.ok !== true){
+        // The script refused the round (no Logs tab, header mismatch ...). Keep it queued, try again later.
+        sheetSetStatus({ err: 'Sheet rejected the round', errAt: Date.now() });
+        break;
+      }
+      // The script saved it (or already had it), so remove that round from the queue.
+      sheetSetStatus({ lastSent: Date.now() });
       saveSheetQueue(sheetQueue().filter(r => r.round_id !== q[0].round_id));
     }
   } finally {
@@ -682,25 +720,8 @@ function finishRound(){
     saveSessions(sessions);
   }
 
-  // Analytics: tell Google Analytics a round finished (the snippet in index.html defines window.gtag).
-  // Wrapped in try/catch so a problem here can never break the Results screen.
-  try {
-    if(typeof window.gtag === 'function' && !state.isRetry){   // retries are not real rounds, so they are not sent
-      const isMixedRound = state.skill === 'mixed';
-      window.gtag('event', 'round_complete', {
-        skill: state.skill,                                                              // e.g. 'half', 'add', or 'mixed'
-        level: isMixedRound ? 'mixed' : matchingDifficultyForConfig(state.skill, activeConfig(state.skill)),   // 'veryeasy' ... 'custom'
-        accuracy: accuracy,                                                              // 0-100
-        avg_time: Math.round(avgTime * 10) / 10,                                         // seconds, 1 decimal
-        questions: state.totalQuestions,
-        is_practice: state.practiceMode ? 'yes' : 'no',
-        from_challenge: state.fromChallenge ? 'yes' : 'no',
-        player_name: resName || '(not set)'
-      });
-    }
-  } catch(e){}
-  // Google Sheet log: every original round, and only the first retry of a round (is_retry: yes).
-  if(!state.isRetry || state.retryIsFirst){
+  // Google Sheet log: original rounds only. Retry rounds are not sent.
+  if(!state.isRetry){
     try {
       sheetEnqueue({
         timestamp: sessionRecord.date,
@@ -713,9 +734,8 @@ function finishRound(){
         questions: state.totalQuestions,
         correct: state.correctCount,
         is_practice: state.practiceMode ? 'yes' : 'no',
-        from_challenge: (!state.isRetry && state.fromChallenge) ? 'yes' : 'no',
-        player_name: resName || '(not set)',
-        is_retry: state.isRetry ? 'yes' : 'no'
+        from_challenge: state.fromChallenge ? 'yes' : 'no',
+        player_name: resName || '(not set)'
       });
     } catch(e){}
   }
@@ -829,7 +849,6 @@ document.getElementById('btnRetry').addEventListener('click', () => {
     retryChain.push(snapshotResults());   // so Back from the retry's Results returns to the original screen
     if(typeof window.navRetryPush === 'function') window.navRetryPush();   // the one extra browser-history entry (nav.js)
   }
-    state.retryIsFirst = !state.isRetry;   // only the first retry of a round goes to the sheet
   state.retryParent = state.lastRecordDate;   // the saved round this retry belongs to (History shows it underneath that round)
   pendingRetry = state.lastMissed;
   startRound();

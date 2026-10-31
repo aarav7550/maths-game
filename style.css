@@ -1832,6 +1832,16 @@
 .sc-letter{ display:flex; align-items:center; gap:9px; font-size:13px; color:var(--ink); font-weight:600; min-width:0; }
 
 /* About us: a second changelog entry sits below the first */
+/* Hidden developer panel (About): same rows as App info; values may be long, so they wrap */
+#view-about #abBuildRow{ -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+#view-about .pg-card[hidden]{ display:none; }
+#view-about #abDev .ab-value{ font-size:12.5px; max-width:62%; overflow-wrap:anywhere; }
+@keyframes abDevIn{ from{ opacity:0; transform:translateY(-10px); } to{ opacity:1; transform:none; } }
+#view-about #abDev.ab-dev-in{ animation:abDevIn .3s ease-out; }
+@keyframes abDevOut{ from{ opacity:1; transform:none; } to{ opacity:0; transform:translateY(-10px); } }
+#view-about #abDev.ab-dev-out{ animation:abDevOut .25s ease-in forwards; }
+@media (prefers-reduced-motion: reduce){ #view-about #abDev.ab-dev-in, #view-about #abDev.ab-dev-out{ animation:none; } }
+#view-about .ab-dev-hide{ align-self:flex-start; margin-top:12px; padding:8px 16px; border:1px solid var(--line); border-radius:8px; background:none; color:var(--ink-dim); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; }
 #view-about .ab-log + .ab-log{ margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
 
 /* the 3-dot menu: highlight the keyboard-selected option (menu opened with Shift + M, or moved with the arrow keys) */

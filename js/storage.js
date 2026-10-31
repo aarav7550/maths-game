@@ -32,7 +32,9 @@ const KEY_NAMES = {
   lastLevel:   'game_last_level_v1',
   lastCount:   'game_last_count_v1',
   decimalHint: 'decimalHintSeen',
-  signHint:    'signHintSeen'
+  signHint:    'signHintSeen',
+  sheetStatus: 'sheet_status_v1',  // result of the last Google Sheet send (shown in the About page developer panel)
+  devOpenUntil:'dev_open_until_v1' // time (ms) until which the About developer panel stays open
 };
 (function migrateLegacyKeys(){
   try{

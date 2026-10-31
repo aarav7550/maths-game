@@ -35,26 +35,6 @@
 #updateToast button{flex:none;min-width:112px;border:0;border-radius:9px;padding:8px 14px;background:#FFFFFF;color:#14171C;font:700 13px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;cursor:pointer;}
 #updateToast button:disabled{opacity:.6;cursor:default;}
 </style>
-<!-- Google Analytics (gtag.js): picks the right property for each site -->
-<script>
-  (function () {
-    var PUBLIC_ID = 'G-BQ4V6ZR9X4';   // public site  (/maths-game/)
-    var BETA_ID   = 'G-JE8BC7CMT5';   // beta site    (/math-game2/)
-    var id = null;
-    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') id = BETA_ID;
-    else if (location.pathname.indexOf('/maths-game/') === 0) id = PUBLIC_ID;
-    else if (location.pathname.indexOf('/math-game2/') === 0) id = BETA_ID;
-    if (!id) return;   // any other address: send nothing
-    var s = document.createElement('script');
-    s.async = true;
-    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
-    document.head.appendChild(s);
-    window.dataLayer = window.dataLayer || [];
-    window.gtag = function () { dataLayer.push(arguments); };
-    gtag('js', new Date());
-    gtag('config', id);
-  })();
-</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -245,6 +225,7 @@
       <div class="name-title">What should we call you?</div>
       <div class="name-sub">Shows in your greeting on the home screen. Leave it empty to remove it.</div>
       <input class="name-input" id="nameInput" type="text" maxlength="20" placeholder="Your name" autocomplete="off" autocapitalize="words" enterkeyhint="done">
+      <div id="nameErr" style="display:none;align-items:center;gap:6px;text-align:left;margin:0;font-size:13px;line-height:1.35;font-weight:500;color:#C0392B;"></div>
       <div class="name-actions">
         <button class="name-btn ghost" id="nameCancel" type="button">Cancel</button>
         <button class="name-btn solid" id="nameSave" type="button">Save</button>
@@ -585,9 +566,18 @@
       <div class="pg-card">
         <div class="pg-card-title">App info</div>
         <div class="ab-row"><span class="ab-label">Version</span><span class="ab-value">2.0.0</span></div>
-        <div class="ab-row"><span class="ab-label">Build</span><span class="ab-value" id="abBuild">&mdash;</span></div>
+        <div class="ab-row" id="abBuildRow"><span class="ab-label">Build</span><span class="ab-value" id="abBuild">&mdash;</span></div>
         <div class="ab-row"><span class="ab-label">Built for</span><span class="ab-value">CAT preparation</span></div>
         <div class="ab-row"><span class="ab-label">Runs on</span><span class="ab-value">Browser <span class="ab-badge">installable as an app</span></span></div>
+      </div>
+
+      <!-- Hidden developer panel: tap the Build row 7 times to show it (info.js) -->
+      <div class="pg-card" id="abDev" hidden>
+        <div class="pg-card-title">Developer</div>
+        <div class="ab-row"><span class="ab-label">Sheet log: waiting</span><span class="ab-value" id="abDevQueue">0</span></div>
+        <div class="ab-row"><span class="ab-label">Last sent</span><span class="ab-value" id="abDevSent">&mdash;</span></div>
+        <div class="ab-row"><span class="ab-label">Last error</span><span class="ab-value" id="abDevErr">&mdash;</span></div>
+        <button type="button" class="ab-dev-hide" id="abDevHide">Hide</button>
       </div>
 
       <div class="pg-card">

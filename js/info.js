@@ -24,6 +24,68 @@
   }
   document.getElementById('btnAboutUs').addEventListener('click', askBuild);
 
+  // ---------- Hidden developer panel ----------
+  // Tap the Build row 7 times (each tap within 2 s of the last) to show it. It then stays open for 2 hours (also after a reload).
+  const devPanel = document.getElementById('abDev');
+  const devRow = document.getElementById('abBuildRow');
+  const DEV_OPEN_KEY = KEY_PREFIX + KEY_NAMES.devOpenUntil, DEV_OPEN_MS = 2 * 60 * 60 * 1000;
+  let devTaps = 0, devLastTap = 0;
+  function devTime(ms){ return ms ? new Date(ms).toLocaleString() : '\u2014'; }
+  function fillDevPanel(){
+    let st = {};
+    try { st = JSON.parse(localStorage.getItem(KEY_PREFIX + KEY_NAMES.sheetStatus)) || {}; } catch(e){}
+    let waiting = 0;
+    try { waiting = (JSON.parse(localStorage.getItem('foxy_sheet_queue_v1')) || []).length; } catch(e){}
+    document.getElementById('abDevQueue').textContent = waiting;
+    document.getElementById('abDevSent').textContent = devTime(st.lastSent);
+    document.getElementById('abDevErr').textContent = st.err ? st.err + ' (' + devTime(st.errAt) + ')' : '\u2014';
+  }
+  function showDevPanel(animate){
+    fillDevPanel();
+    devPanel.classList.remove('ab-dev-in');
+    devPanel.hidden = false;
+    if(animate){ void devPanel.offsetWidth; devPanel.classList.add('ab-dev-in'); }   // slide/fade in only when just revealed by the taps
+  }
+  // hideDevPanel(true) = fade out first (the Hide button); no argument = hide at once (every other case)
+  function hideDevPanel(animate){
+    devTaps = 0;
+    try { localStorage.removeItem(DEV_OPEN_KEY); } catch(e){}
+    if(animate === true && !devPanel.hidden){
+      if(devPanel.classList.contains('ab-dev-out')) return;                    // already on its way out
+      if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+        devPanel.classList.remove('ab-dev-in');
+        devPanel.classList.add('ab-dev-out');                                  // 'animationend' below finishes the hide
+        return;
+      }
+    }
+    devPanel.classList.remove('ab-dev-in', 'ab-dev-out');
+    devPanel.hidden = true;
+  }
+  // on every visit to About: still inside the 2 hours = open, otherwise hidden
+  function restoreDevPanel(){
+    let until = 0;
+    try { until = Number(localStorage.getItem(DEV_OPEN_KEY)) || 0; } catch(e){}
+    if(Date.now() < until) showDevPanel(); else hideDevPanel();
+  }
+  if(devRow && devPanel){
+    devRow.addEventListener('click', () => {
+      const now = performance.now();
+      devTaps = (now - devLastTap < 2000) ? devTaps + 1 : 1;
+      devLastTap = now;
+      if(devTaps >= 7){
+        devTaps = 0;
+        try { localStorage.setItem(DEV_OPEN_KEY, String(Date.now() + DEV_OPEN_MS)); } catch(e){}
+        showDevPanel(true);
+      }
+    });
+    devPanel.addEventListener('animationend', () => {
+      if(devPanel.classList.contains('ab-dev-out')){ devPanel.classList.remove('ab-dev-out'); devPanel.hidden = true; }
+      else devPanel.classList.remove('ab-dev-in');
+    });
+    document.getElementById('abDevHide').addEventListener('click', () => hideDevPanel(true));
+    document.getElementById('btnAboutUs').addEventListener('click', restoreDevPanel);
+  }
+
   // ---------- Keyboard shortcuts popup ----------
   const scOverlay = document.getElementById('shortcutsModal');
   const hintOverlay = document.getElementById('shortcutHintModal');
